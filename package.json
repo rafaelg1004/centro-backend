@@ -16,6 +16,7 @@
     "docxtemplater-image-module-free": "^1.1.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "image-size": "^2.0.2",
     "mongoose": "^8.14.3",
     "pdfkit": "^0.17.1",
     "pizzip": "^3.2.0"
