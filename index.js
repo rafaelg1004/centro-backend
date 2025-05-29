@@ -11,7 +11,8 @@ const PORT = process.env.PORT ||4000;
 app.use(cors({
   origin: [
     'https://centro-de-estimulacion.web.app', // tu frontend en Firebase Hosting
-    'https://www.centro-de-estimulacion.web.app' // por si usas el www
+    'https://www.centro-de-estimulacion.web.app', // por si usas el www
+    'http://localhost:3000' // tu frontend local
   ]
 }));
 app.use(express.json());
