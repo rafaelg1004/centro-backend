@@ -8,7 +8,12 @@ const app = express();
 const PORT = process.env.PORT ||4000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://centro-de-estimulacion.web.app', // tu frontend en Firebase Hosting
+    'https://www.centro-de-estimulacion.web.app' // por si usas el www
+  ]
+}));
 app.use(express.json());
 
 // Conexión a MongoDB Atlas
