@@ -23,7 +23,7 @@ router.post("/exportar-word", async (req, res) => {
   const data = req.body;
   try {
     const content = fs.readFileSync(
-      path.resolve(__dirname, "../plantilla/VALORACIONEST.AUD.docx"),
+      path.resolve(__dirname, "../plantilla/prueba.docx"),
       "binary"
     );
     const zip = new PizZip(content);
