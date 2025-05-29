@@ -40,7 +40,7 @@ router.post("/exportar-word", async (req, res) => {
 
     // Cargar la plantilla .docx
     const content = fs.readFileSync(
-      path.resolve(__dirname, "../plantilla/prueba.docx"),
+      path.resolve(__dirname, "../plantilla/VALORACIONEST.AUD.docx"),
       "binary"
     );
 
