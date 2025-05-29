@@ -72,13 +72,13 @@ router.post("/exportar-word", async (req, res) => {
     res.setHeader("Content-Disposition", "attachment; filename=valoracion.pdf");
     res.send(pdfBuffer);
   } catch (error) {
-    console.error("❌ Error al generar docx:", error);
+    console.error("❌ Error al generar docx o PDF:", error);
     res.status(500).send("Error al generar documento");
   }
 });
 
 async function convertirDocxAPdf(docxBuffer) {
-  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u"; // <-- pon aquí tu API Key
+  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u"; // <-- pon aquí tu API Key de PDF.co
   const url = "https://api.pdf.co/v1/pdf/convert/from/doc";
 
   const formData = new FormData();
