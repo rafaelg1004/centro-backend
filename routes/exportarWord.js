@@ -69,26 +69,27 @@ router.post("/exportar-word", async (req, res) => {
 
     // --- AGREGAR FIRMAS AL PDF ---
     const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
 
-    // Firma profesional (ejemplo: página 1, posición x=100, y=100, ancho=150, alto=50)
-    if (data.firmaProfesional) {
-      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
-      const page = pdfDoc.getPages()[0];
-      page.drawImage(firmaImg, { x: 100, y: 100, width: 150, height: 50 });
+    // Firma profesional y representante en la penúltima página
+    if (totalPages >= 2) {
+      const penultima = pages[totalPages - 2];
+      if (data.firmaProfesional) {
+        const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
+        penultima.drawImage(firmaImg, { x: 100, y: 100, width: 150, height: 50 });
+      }
+      if (data.firmaRepresentante) {
+        const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
+        penultima.drawImage(firmaImg, { x: 100, y: 50, width: 150, height: 50 });
+      }
     }
 
-    // Firma representante (ejemplo: página 1, posición x=100, y=50, ancho=150, alto=50)
-    if (data.firmaRepresentante) {
-      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
-      const page = pdfDoc.getPages()[0];
-      page.drawImage(firmaImg, { x: 100, y: 50, width: 150, height: 50 });
-    }
-
-    // Firma autorización (ejemplo: página 1, posición x=100, y=10, ancho=150, alto=50)
-    if (data.firmaAutorizacion) {
+    // Firma autorización en la última página
+    if (totalPages >= 1 && data.firmaAutorizacion) {
+      const ultima = pages[totalPages - 1];
       const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
-      const page = pdfDoc.getPages()[0];
-      page.drawImage(firmaImg, { x: 100, y: 10, width: 150, height: 50 });
+      ultima.drawImage(firmaImg, { x: 100, y: 10, width: 150, height: 50 });
     }
 
     pdfBuffer = await pdfDoc.save();
