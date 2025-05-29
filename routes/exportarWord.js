@@ -78,23 +78,44 @@ router.post("/exportar-word", async (req, res) => {
 });
 
 async function convertirDocxAPdf(docxBuffer) {
-  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u"; // <-- pon aquí tu API Key de PDF.co
+  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u";
   const url = "https://api.pdf.co/v1/pdf/convert/from/doc";
 
   const formData = new FormData();
   formData.append("file", docxBuffer, "documento.docx");
 
-  const response = await axios.post(url, formData, {
-    headers: {
-      ...formData.getHeaders(),
-      "x-api-key": apiKey,
-    },
-    responseType: "arraybuffer",
-  });
+  try {
+    const response = await axios.post(url, formData, {
+      headers: {
+        ...formData.getHeaders(),
+        "x-api-key": apiKey,
+      },
+      responseType: "arraybuffer",
+    });
 
-  console.log(response.data.toString());
+    // Intenta parsear la respuesta como JSON para ver el mensaje de error
+    try {
+      const json = JSON.parse(response.data.toString());
+      console.log("Respuesta PDF.co:", json);
+    } catch {
+      console.log("Respuesta PDF.co (no JSON):", response.data.toString());
+    }
 
-  return response.data; // PDF en buffer
+    return response.data; // PDF en buffer
+  } catch (err) {
+    // Imprime el mensaje de error del servidor externo
+    if (err.response && err.response.data) {
+      try {
+        const json = JSON.parse(err.response.data.toString());
+        console.error("❌ Error PDF.co:", json);
+      } catch {
+        console.error("❌ Error PDF.co (no JSON):", err.response.data.toString());
+      }
+    } else {
+      console.error("❌ Error PDF.co:", err);
+    }
+    throw err;
+  }
 }
 
 module.exports = router;
