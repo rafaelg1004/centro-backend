@@ -92,6 +92,8 @@ async function convertirDocxAPdf(docxBuffer) {
     responseType: "arraybuffer",
   });
 
+  console.log(response.data.toString());
+
   return response.data; // PDF en buffer
 }
 
