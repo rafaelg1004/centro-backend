@@ -32,7 +32,7 @@ router.post("/exportar-word", async (req, res) => {
 
     // Guardar temporalmente
     const filename = `valoracion_${Date.now()}.docx`;
-    const filepath = path.resolve(__dirname, `../public/${filename}`);
+    const filepath = path.resolve(__dirname, `../temp/${filename}`);
     fs.writeFileSync(filepath, buffer);
 
     // Enviar al frontend como descarga
