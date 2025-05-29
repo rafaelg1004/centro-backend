@@ -6,6 +6,7 @@ const Docxtemplater = require("docxtemplater");
 const axios = require("axios");
 const ImageModule = require("docxtemplater-image-module-free");
 const { imageSize } = require("image-size");
+const FormData = require("form-data");
 
 const router = express.Router();
 
@@ -63,19 +64,35 @@ router.post("/exportar-word", async (req, res) => {
 
     const buffer = doc.getZip().generate({ type: "nodebuffer" });
 
-    // Guardar temporalmente
-    const filename = `valoracion_${Date.now()}.docx`;
-    const filepath = path.resolve(__dirname, `../temp/${filename}`);
-    fs.writeFileSync(filepath, buffer);
+    // Convertir a PDF usando el servicio externo
+    const pdfBuffer = await convertirDocxAPdf(buffer);
 
-    // Enviar al frontend como descarga
-    res.download(filepath, filename, () => {
-      fs.unlinkSync(filepath); // eliminar después
-    });
+    // Enviar el PDF al frontend
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=valoracion.pdf");
+    res.send(pdfBuffer);
   } catch (error) {
     console.error("❌ Error al generar docx:", error);
     res.status(500).send("Error al generar documento");
   }
 });
+
+async function convertirDocxAPdf(docxBuffer) {
+  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u"; // <-- pon aquí tu API Key
+  const url = "https://api.pdf.co/v1/pdf/convert/from/doc";
+
+  const formData = new FormData();
+  formData.append("file", docxBuffer, "documento.docx");
+
+  const response = await axios.post(url, formData, {
+    headers: {
+      ...formData.getHeaders(),
+      "x-api-key": apiKey,
+    },
+    responseType: "arraybuffer",
+  });
+
+  return response.data; // PDF en buffer
+}
 
 module.exports = router;
