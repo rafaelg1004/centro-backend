@@ -7,6 +7,7 @@ const axios = require("axios");
 const ImageModule = require("docxtemplater-image-module-free");
 const { imageSize } = require("image-size");
 const FormData = require("form-data");
+const { PDFDocument } = require("pdf-lib");
 
 const router = express.Router();
 
@@ -64,7 +65,34 @@ router.post("/exportar-word", async (req, res) => {
     const buffer = doc.getZip().generate({ type: "nodebuffer" });
 
     // Convertir a PDF usando el servicio externo (PDF.co)
-    const pdfBuffer = await convertirDocxAPdf(buffer);
+    let pdfBuffer = await convertirDocxAPdf(buffer);
+
+    // --- AGREGAR FIRMAS AL PDF ---
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+
+    // Firma profesional (ejemplo: página 1, posición x=100, y=100, ancho=150, alto=50)
+    if (data.firmaProfesional) {
+      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
+      const page = pdfDoc.getPages()[0];
+      page.drawImage(firmaImg, { x: 100, y: 100, width: 150, height: 50 });
+    }
+
+    // Firma representante (ejemplo: página 1, posición x=100, y=50, ancho=150, alto=50)
+    if (data.firmaRepresentante) {
+      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
+      const page = pdfDoc.getPages()[0];
+      page.drawImage(firmaImg, { x: 100, y: 50, width: 150, height: 50 });
+    }
+
+    // Firma autorización (ejemplo: página 1, posición x=100, y=10, ancho=150, alto=50)
+    if (data.firmaAutorizacion) {
+      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
+      const page = pdfDoc.getPages()[0];
+      page.drawImage(firmaImg, { x: 100, y: 10, width: 150, height: 50 });
+    }
+
+    pdfBuffer = await pdfDoc.save();
+    // --- FIN AGREGAR FIRMAS ---
 
     // Enviar el PDF al frontend
     res.setHeader("Content-Type", "application/pdf");
