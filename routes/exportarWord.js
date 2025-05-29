@@ -14,7 +14,6 @@ const router = express.Router();
 async function urlToBase64(url) {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
   const base64 = Buffer.from(response.data, 'binary').toString('base64');
-  // Ajusta el tipo si tus firmas pueden ser jpg, png, etc.
   return `data:image/png;base64,${base64}`;
 }
 
@@ -64,7 +63,7 @@ router.post("/exportar-word", async (req, res) => {
 
     const buffer = doc.getZip().generate({ type: "nodebuffer" });
 
-    // Convertir a PDF usando el servicio externo
+    // Convertir a PDF usando el servicio externo (PDF.co)
     const pdfBuffer = await convertirDocxAPdf(buffer);
 
     // Enviar el PDF al frontend
@@ -77,45 +76,53 @@ router.post("/exportar-word", async (req, res) => {
   }
 });
 
+// SUBIDA Y CONVERSIÓN PDF.CO
+async function uploadFileToPdfCo(docxBuffer) {
+  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u";
+  const url = "https://api.pdf.co/v1/file/upload/get-presigned-url?contenttype=application/vnd.openxmlformats-officedocument.wordprocessingml.document&name=documento.docx";
+
+  // 1. Obtén la URL de subida
+  const presigned = await axios.get(url, {
+    headers: { "x-api-key": apiKey }
+  });
+  const uploadUrl = presigned.data.presignedUrl;
+  const fileUrl = presigned.data.url;
+
+  // 2. Sube el archivo a la URL presignada
+  await axios.put(uploadUrl, docxBuffer, {
+    headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+  });
+
+  return fileUrl; // Esta URL la usarás en el siguiente paso
+}
+
 async function convertirDocxAPdf(docxBuffer) {
   const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u";
+  // 1. Sube el archivo y obtén la URL
+  const fileUrl = await uploadFileToPdfCo(docxBuffer);
+
+  // 2. Llama al endpoint de conversión usando la URL
   const url = "https://api.pdf.co/v1/pdf/convert/from/doc";
+  const body = {
+    url: fileUrl,
+    name: "documento.pdf"
+  };
 
-  const formData = new FormData();
-  formData.append("file", docxBuffer, "documento.docx");
-
-  try {
-    const response = await axios.post(url, formData, {
-      headers: {
-        ...formData.getHeaders(),
-        "x-api-key": apiKey,
-      },
-      responseType: "arraybuffer",
-    });
-
-    // Intenta parsear la respuesta como JSON para ver el mensaje de error
-    try {
-      const json = JSON.parse(response.data.toString());
-      console.log("Respuesta PDF.co:", json);
-    } catch {
-      console.log("Respuesta PDF.co (no JSON):", response.data.toString());
+  const response = await axios.post(url, body, {
+    headers: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json"
     }
+  });
 
-    return response.data; // PDF en buffer
-  } catch (err) {
-    // Imprime el mensaje de error del servidor externo
-    if (err.response && err.response.data) {
-      try {
-        const json = JSON.parse(err.response.data.toString());
-        console.error("❌ Error PDF.co:", json);
-      } catch {
-        console.error("❌ Error PDF.co (no JSON):", err.response.data.toString());
-      }
-    } else {
-      console.error("❌ Error PDF.co:", err);
-    }
-    throw err;
+  // 3. Descarga el PDF generado
+  if (!response.data.url) {
+    console.error("❌ Error PDF.co:", response.data);
+    throw new Error("No se pudo obtener el PDF");
   }
+  const pdfUrl = response.data.url;
+  const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
+  return pdfResponse.data;
 }
 
 module.exports = router;
