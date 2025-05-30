@@ -77,11 +77,11 @@ router.post("/exportar-word", async (req, res) => {
       const penultima = pages[totalPages - 2];
       if (data.firmaProfesional) {
         const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 100, y: 100, width: 150, height: 50 });
+        penultima.drawImage(firmaImg, { x: 100, y: 400, width: 150, height: 50 });
       }
       if (data.firmaRepresentante) {
         const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 100, y: 50, width: 150, height: 50 });
+        penultima.drawImage(firmaImg, { x: 250, y: 400, width: 150, height: 50 });
       }
     }
 
@@ -89,7 +89,7 @@ router.post("/exportar-word", async (req, res) => {
     if (totalPages >= 1 && data.firmaAutorizacion) {
       const ultima = pages[totalPages - 1];
       const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
-      ultima.drawImage(firmaImg, { x: 100, y: 10, width: 150, height: 50 });
+      ultima.drawImage(firmaImg, { x: 50, y: 500, width: 150, height: 50 });
     }
 
     pdfBuffer = await pdfDoc.save();
