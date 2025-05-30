@@ -7,7 +7,7 @@ const axios = require("axios");
 const ImageModule = require("docxtemplater-image-module-free");
 const { imageSize } = require("image-size");
 const FormData = require("form-data");
-const { PDFDocument } = require("pdf-lib");
+const { PDFDocument, rgb } = require("pdf-lib");
 
 const router = express.Router();
 
@@ -94,9 +94,9 @@ router.post("/exportar-word", async (req, res) => {
       // Dibuja la leyenda debajo de la firma
       ultima.drawText("Firma Autorización", {
         x: 50,
-        y: 340, // Un poco debajo de la imagen (ajusta según necesidad)
+        y: 340,
         size: 12,
-        color: pdfLib.rgb(0, 0, 0),
+        color: rgb(0, 0, 0),
       });
     }
 
