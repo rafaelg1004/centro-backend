@@ -77,11 +77,11 @@ router.post("/exportar-word", async (req, res) => {
       const penultima = pages[totalPages - 2];
       if (data.firmaProfesional) {
         const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 100, y: 250, width: 150, height: 50 });
+        penultima.drawImage(firmaImg, { x: 100, y: 230, width: 150, height: 50 });
       }
       if (data.firmaRepresentante) {
         const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 350, y: 250, width: 150, height: 50 });
+        penultima.drawImage(firmaImg, { x: 350, y: 230, width: 150, height: 50 });
       }
     }
 
@@ -89,7 +89,15 @@ router.post("/exportar-word", async (req, res) => {
     if (totalPages >= 1 && data.firmaAutorizacion) {
       const ultima = pages[totalPages - 1];
       const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
+      // Dibuja la firma
       ultima.drawImage(firmaImg, { x: 50, y: 350, width: 150, height: 50 });
+      // Dibuja la leyenda debajo de la firma
+      ultima.drawText("Firma Autorización", {
+        x: 50,
+        y: 340, // Un poco debajo de la imagen (ajusta según necesidad)
+        size: 12,
+        color: pdfLib.rgb(0, 0, 0),
+      });
     }
 
     pdfBuffer = await pdfDoc.save();
