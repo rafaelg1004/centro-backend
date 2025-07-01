@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const ValoracionIngreso = require('../models/ValoracionIngreso');
 
-router.post('/valoraciones', async (req, res) => {
+// Crear valoración
+router.post('/', async (req, res) => {
   try {
     const nuevaValoracion = new ValoracionIngreso(req.body);
     await nuevaValoracion.save();
@@ -13,40 +14,54 @@ router.post('/valoraciones', async (req, res) => {
   }
 });
 
-router.get('/valoraciones', async (req, res) => {
+// Obtener todas las valoraciones (con filtros opcionales)
+router.get('/', async (req, res) => {
   try {
-    const { documento, fechaInicio, fechaFin } = req.query;
-    const filtro = {};
-
-    // Buscar por cédula (registroCivil)
-    if (documento) {
-      filtro.registroCivil = { $regex: documento, $options: "i" };
-    }
-
-    // Buscar por rango de fechas
-    if (fechaInicio || fechaFin) {
-      filtro.fecha = {};
-      if (fechaInicio) filtro.fecha.$gte = fechaInicio;
-      if (fechaFin) filtro.fecha.$lte = fechaFin;
-    }
-
-    const valoraciones = await ValoracionIngreso.find(filtro);
+    const valoraciones = await ValoracionIngreso.find({ /* tus filtros */ }).populate('paciente');
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error });
   }
 });
 
-router.get('/valoraciones/:id', async (req, res) => {
+// Obtener una valoración por ID
+router.get('/:id', async (req, res) => {
   try {
-    const valoracion = await ValoracionIngreso.findById(req.params.id);
-    if (!valoracion) {
-      return res.status(404).json({ mensaje: 'Valoración no encontrada' });
-    }
+    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente');
     res.json(valoracion);
   } catch (error) {
-    console.error('Error al obtener valoración por ID:', error);
     res.status(500).json({ mensaje: 'Error al obtener valoración', error });
+  }
+});
+
+// Eliminar una valoración
+router.delete('/:id', async (req, res) => {
+  try {
+    const deleted = await ValoracionIngreso.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ mensaje: "Valoración no encontrada" });
+    }
+    res.json({ mensaje: "Valoración eliminada correctamente" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Actualizar una valoración por ID
+router.put('/:id', async (req, res) => {
+  try {
+    const actualizada = await ValoracionIngreso.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!actualizada) {
+      return res.status(404).json({ mensaje: 'Valoración no encontrada' });
+    }
+    res.json({ mensaje: 'Valoración actualizada correctamente', valoracion: actualizada });
+  } catch (error) {
+    console.error('Error al actualizar valoración:', error);
+    res.status(500).json({ mensaje: 'Error al actualizar valoración', error });
   }
 });
 

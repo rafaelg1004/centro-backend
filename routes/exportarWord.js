@@ -6,8 +6,8 @@ const Docxtemplater = require("docxtemplater");
 const axios = require("axios");
 const ImageModule = require("docxtemplater-image-module-free");
 const { imageSize } = require("image-size");
-const FormData = require("form-data");
 const { PDFDocument, rgb } = require("pdf-lib");
+const { execSync } = require("child_process");
 
 const router = express.Router();
 
@@ -29,6 +29,8 @@ function getImageSize(imgBase64) {
 
 router.post("/exportar-word", async (req, res) => {
   const data = req.body;
+  const tempDir = path.join(__dirname, "../temp");
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
   try {
     // Procesa todas las firmas que sean URL
@@ -50,7 +52,7 @@ router.post("/exportar-word", async (req, res) => {
       getImage: (tagValue) => getImageBuffer(tagValue),
       getSize: (img, tagValue) => {
         const { width, height } = getImageSize(tagValue);
-        return [width * 0.03, height * 0.03]; // Ajusta el tamaño si lo necesitas
+        return [width * 0.03, height * 0.03];
       },
     });
 
@@ -62,10 +64,17 @@ router.post("/exportar-word", async (req, res) => {
 
     doc.render(data);
 
-    const buffer = doc.getZip().generate({ type: "nodebuffer" });
+    // Guarda el Word temporalmente
+    const filename = `valoracion_${Date.now()}`;
+    const docxPath = path.join(tempDir, `${filename}.docx`);
+    const pdfPath = path.join(tempDir, `${filename}.pdf`);
+    fs.writeFileSync(docxPath, doc.getZip().generate({ type: "nodebuffer" }));
 
-    // Convertir a PDF usando el servicio externo (PDF.co)
-    let pdfBuffer = await convertirDocxAPdf(buffer);
+    // Convierte el Word a PDF usando LibreOffice
+    execSync(`soffice --headless --convert-to pdf --outdir "${tempDir}" "${docxPath}"`);
+
+    // Lee el PDF generado
+    let pdfBuffer = fs.readFileSync(pdfPath);
 
     // --- AGREGAR FIRMAS AL PDF ---
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -89,9 +98,7 @@ router.post("/exportar-word", async (req, res) => {
     if (totalPages >= 1 && data.firmaAutorizacion) {
       const ultima = pages[totalPages - 1];
       const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
-      // Dibuja la firma
       ultima.drawImage(firmaImg, { x: 50, y: 350, width: 150, height: 50 });
-      // Dibuja la leyenda debajo de la firma
       ultima.drawText("Firma Autorización", {
         x: 50,
         y: 340,
@@ -107,59 +114,15 @@ router.post("/exportar-word", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=valoracion.pdf");
     res.send(pdfBuffer);
+
+    // Limpieza de archivos temporales
+    fs.unlinkSync(docxPath);
+    fs.unlinkSync(pdfPath);
+
   } catch (error) {
     console.error("❌ Error al generar docx o PDF:", error);
     res.status(500).send("Error al generar documento");
   }
 });
-
-// SUBIDA Y CONVERSIÓN PDF.CO
-async function uploadFileToPdfCo(docxBuffer) {
-  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u";
-  const url = "https://api.pdf.co/v1/file/upload/get-presigned-url?contenttype=application/vnd.openxmlformats-officedocument.wordprocessingml.document&name=documento.docx";
-
-  // 1. Obtén la URL de subida
-  const presigned = await axios.get(url, {
-    headers: { "x-api-key": apiKey }
-  });
-  const uploadUrl = presigned.data.presignedUrl;
-  const fileUrl = presigned.data.url;
-
-  // 2. Sube el archivo a la URL presignada
-  await axios.put(uploadUrl, docxBuffer, {
-    headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
-  });
-
-  return fileUrl; // Esta URL la usarás en el siguiente paso
-}
-
-async function convertirDocxAPdf(docxBuffer) {
-  const apiKey = "binaria.0920@gmail.com_wBp2idsLSVMv74iKWAq1qXQzLA7jkSU71D8zaUU4GlfJKrKXSUUQKNtSqPtbZY2u";
-  // 1. Sube el archivo y obtén la URL
-  const fileUrl = await uploadFileToPdfCo(docxBuffer);
-
-  // 2. Llama al endpoint de conversión usando la URL
-  const url = "https://api.pdf.co/v1/pdf/convert/from/doc";
-  const body = {
-    url: fileUrl,
-    name: "documento.pdf"
-  };
-
-  const response = await axios.post(url, body, {
-    headers: {
-      "x-api-key": apiKey,
-      "Content-Type": "application/json"
-    }
-  });
-
-  // 3. Descarga el PDF generado
-  if (!response.data.url) {
-    console.error("❌ Error PDF.co:", response.data);
-    throw new Error("No se pudo obtener el PDF");
-  }
-  const pdfUrl = response.data.url;
-  const pdfResponse = await axios.get(pdfUrl, { responseType: "arraybuffer" });
-  return pdfResponse.data;
-}
 
 module.exports = router;

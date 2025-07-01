@@ -8,14 +8,9 @@ const app = express();
 const PORT = process.env.PORT ||4000;
 
 // Middleware
-app.use(cors({
-  origin: [
-    'https://centro-de-estimulacion.web.app', // tu frontend en Firebase Hosting
-    'https://www.centro-de-estimulacion.web.app', // por si usas el www
-    'http://localhost:3000' // tu frontend local
-  ]
-}));
-app.use(express.json());
+app.use(cors());
+app.use(express.json({ limit: '20mb' })); // o más si lo necesitas
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 // Conexión a MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI, {
@@ -31,14 +26,8 @@ const exportarWordRouter = require("./routes/exportarWord");
 app.use("/api", exportarWordRouter);
 const exportarPdfRouter = require("./routes/exportar-pdf");
 app.use("/api", exportarPdfRouter);
+app.use("/api/clases", require("./routes/clases"));
 
-const PacienteSchema = new mongoose.Schema({
-  nombre: String,
-  edad: Number,
-  procedimiento: String,
-  firma: String,
-});
-const Paciente = mongoose.model('Paciente', PacienteSchema);
 
 // Ruta para guardar datos
 app.post('/api/registro', async (req, res) => {
@@ -51,6 +40,12 @@ app.post('/api/registro', async (req, res) => {
     res.status(500).send('Error en el servidor');
   }
 });
+const pagoPaqueteRoutes = require('./routes/pagoPaquetes');
+app.use('/api/pagoPaquete', pagoPaqueteRoutes);
+
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
 app.get("/api/registros", async (req, res) => {
   try {
     const registros = await Paciente.find();
@@ -59,8 +54,23 @@ app.get("/api/registros", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener registros", error });
   }
 });
+
+
 const valoracionRoutes = require('./routes/valoraciones');
-app.use('/api', valoracionRoutes);
+app.use('/api/valoraciones', valoracionRoutes);
+
+const pacientesRoutes = require('./routes/pacientes');
+app.use('/api/pacientes', pacientesRoutes);
+
+const pacientesAdultosRoutes = require('./routes/pacientesAdultos');
+app.use('/api/pacientes-adultos', pacientesAdultosRoutes);
+
+const valoracionIngresoAdultosLactanciaRoutes = require('./routes/valoracionIngresoAdultosLactancia');
+app.use('/api/valoracion-ingreso-adultos-lactancia', valoracionIngresoAdultosLactanciaRoutes);
+
+const consentimientoPerinatalRouter = require('./routes/consentimientoPerinatal');
+app.use('/api/consentimiento-perinatal', consentimientoPerinatalRouter);
+app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
 
 // Servir frontend si lo necesitas (opcional)
 // app.use(express.static(path.join(__dirname, '../centro-estimulacion/build')));

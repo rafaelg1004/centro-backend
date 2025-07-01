@@ -1,27 +1,13 @@
 const mongoose = require('mongoose');
 
 const ValoracionIngresoSchema = new mongoose.Schema({
-  // Paso 1
+  paciente: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true }, // referencia al paciente/niño
+
+  // Elimina los campos duplicados de datos generales aquí
+
+  // Paso 1 (solo los campos propios de la valoración, no del paciente)
   fecha: String,
   hora: String,
-  nombres: String,
-  registroCivil: String,
-  genero: String,
-  nacimiento: String,
-  edad: String,
-  peso: String,
-  talla: String,
-  direccion: String,
-  telefono: String,
-  celular: String,
-  pediatra: String,
-  aseguradora: String,
-  madreNombre: String,
-  madreEdad: String,
-  madreOcupacion: String,
-  padreNombre: String,
-  padreEdad: String,
-  padreOcupacion: String,
   motivoDeConsulta: String,
 
   // Paso 2
@@ -67,7 +53,13 @@ const ValoracionIngresoSchema = new mongoose.Schema({
   juegaCon: String,
   juegosPreferidos: String,
   relacionDesconocidos: String,
-  rutinaDiaria: String,
+  rutinaDiaria: [
+    {
+      desde: String,
+      hasta: String,
+      actividad: String
+    }
+  ],
 
   // Paso 4
   ontologico_ControlCefalico_si: Boolean,
@@ -127,6 +119,18 @@ const ValoracionIngresoSchema = new mongoose.Schema({
   anioFirma: String,
   cedulaAutorizacion: String,
   firmaAutorizacion: String, // base64
+
+  // Paso 8 - Consentimiento informado
+  consentimiento_nombreAcudiente: String,
+  consentimiento_ccAcudiente: String,
+  consentimiento_lugarExpedicion: String,
+  consentimiento_nombreNino: String,
+  consentimiento_registroCivil: String,
+  consentimiento_fecha: String,
+  consentimiento_firmaAcudiente: String, // base64
+  consentimiento_ccFirmaAcudiente: String,
+  consentimiento_firmaFisio: String,     // base64
+  consentimiento_ccFirmaFisio: String,
 },
 {
   timestamps: true
