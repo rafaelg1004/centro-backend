@@ -72,6 +72,9 @@ const consentimientoPerinatalRouter = require('./routes/consentimientoPerinatal'
 app.use('/api/consentimiento-perinatal', consentimientoPerinatalRouter);
 app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
 
+const uploadRoutes = require('./routes/upload');
+app.use('/api', uploadRoutes);
+
 // Servir frontend si lo necesitas (opcional)
 // app.use(express.static(path.join(__dirname, '../centro-estimulacion/build')));
 // app.get('*', (req, res) => {
