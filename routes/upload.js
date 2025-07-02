@@ -15,6 +15,7 @@ const upload = multer({
     s3: s3,
     bucket: process.env.AWS_BUCKET_NAME,
     acl: 'public-read',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
       cb(null, Date.now() + '-' + file.originalname);
     }
@@ -22,6 +23,9 @@ const upload = multer({
 });
 
 router.post('/upload', upload.single('imagen'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se subió ningún archivo' });
+  }
   res.json({ url: req.file.location });
 });
 
