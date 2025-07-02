@@ -83,19 +83,16 @@ app.use('/api', uploadRoutes);
 //   res.sendFile(path.join(__dirname, '../centro-estimulacion/build', 'index.html'));
 // });
 
-// Lee tus certificados SSL
-const privateKey = fs.readFileSync('/home/ubuntu/privkey.pem', 'utf8');
-const certificate = fs.readFileSync('/home/ubuntu/cert.pem', 'utf8');
-const ca = fs.readFileSync('/home/ubuntu/chain.pem', 'utf8');
 
-const credentials = { key: privateKey, cert: certificate, ca: ca };
+
+
 
 // Inicia el servidor HTTPS
-https.createServer(credentials, app).listen(4000, () => {
-  console.log('Servidor HTTPS corriendo en el puerto 4000');
-});
+//https.createServer(credentials, app).listen(4000, () => {
+  //console.log('Servidor HTTPS corriendo en el puerto 4000');
+//});
 
 // Levantar el servidor
-//app.listen(PORT, '0.0.0.0', () => {
- // console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-//});
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+});
