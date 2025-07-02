@@ -3,6 +3,8 @@ const express = require('express');
    mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT ||4000;
@@ -81,7 +83,19 @@ app.use('/api', uploadRoutes);
 //   res.sendFile(path.join(__dirname, '../centro-estimulacion/build', 'index.html'));
 // });
 
-// Levantar el servidor
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+// Lee tus certificados SSL
+const privateKey = fs.readFileSync('/ruta/a/privkey.pem', 'utf8');
+const certificate = fs.readFileSync('/ruta/a/cert.pem', 'utf8');
+const ca = fs.readFileSync('/ruta/a/chain.pem', 'utf8');
+
+const credentials = { key: privateKey, cert: certificate, ca: ca };
+
+// Inicia el servidor HTTPS
+https.createServer(credentials, app).listen(4000, () => {
+  console.log('Servidor HTTPS corriendo en el puerto 4000');
 });
+
+// Levantar el servidor
+//app.listen(PORT, '0.0.0.0', () => {
+ // console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+//});
