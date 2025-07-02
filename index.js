@@ -84,9 +84,9 @@ app.use('/api', uploadRoutes);
 // });
 
 // Lee tus certificados SSL
-const privateKey = fs.readFileSync('/ruta/a/privkey.pem', 'utf8');
-const certificate = fs.readFileSync('/ruta/a/cert.pem', 'utf8');
-const ca = fs.readFileSync('/ruta/a/chain.pem', 'utf8');
+const privateKey = fs.readFileSync('/home/ubuntu/privkey.pem', 'utf8');
+const certificate = fs.readFileSync('/home/ubuntu/cert.pem', 'utf8');
+const ca = fs.readFileSync('/home/ubuntu/chain.pem', 'utf8');
 
 const credentials = { key: privateKey, cert: certificate, ca: ca };
 
