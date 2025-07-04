@@ -1,17 +1,14 @@
 require('dotenv').config();
 const express = require('express');
-   mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
 
 const app = express();
-const PORT = process.env.PORT ||4000;
+const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '20mb' })); // o más si lo necesitas
+app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 // Conexión a MongoDB Atlas
@@ -23,15 +20,24 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch(err => console.error('❌ Error al conectar a MongoDB Atlas:', err));
 console.log('MONGODB_URI:', process.env.MONGODB_URI);
 
-// Esquema de paciente
-const exportarWordRouter = require("./routes/exportarWord");
-app.use("/api", exportarWordRouter);
-const exportarPdfRouter = require("./routes/exportar-pdf");
-app.use("/api", exportarPdfRouter);
+// Importa el modelo Paciente
+const Paciente = require('./models/Paciente');
+
+// Rutas
+app.use("/api", require("./routes/exportarWord"));
+app.use("/api", require("./routes/exportar-pdf"));
 app.use("/api/clases", require("./routes/clases"));
+app.use('/api/pagoPaquete', require('./routes/pagoPaquetes'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/valoraciones', require('./routes/valoraciones'));
+app.use('/api/pacientes', require('./routes/pacientes'));
+app.use('/api/pacientes-adultos', require('./routes/pacientesAdultos'));
+app.use('/api/valoracion-ingreso-adultos-lactancia', require('./routes/valoracionIngresoAdultosLactancia'));
+app.use('/api/consentimiento-perinatal', require('./routes/consentimientoPerinatal'));
+app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
+app.use('/api', require('./routes/upload'));
 
-
-// Ruta para guardar datos
+// Endpoints directos
 app.post('/api/registro', async (req, res) => {
   try {
     const nuevo = new Paciente(req.body);
@@ -42,11 +48,6 @@ app.post('/api/registro', async (req, res) => {
     res.status(500).send('Error en el servidor');
   }
 });
-const pagoPaqueteRoutes = require('./routes/pagoPaquetes');
-app.use('/api/pagoPaquete', pagoPaqueteRoutes);
-
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
 
 app.get("/api/registros", async (req, res) => {
   try {
@@ -57,42 +58,13 @@ app.get("/api/registros", async (req, res) => {
   }
 });
 
-
-const valoracionRoutes = require('./routes/valoraciones');
-app.use('/api/valoraciones', valoracionRoutes);
-
-const pacientesRoutes = require('./routes/pacientes');
-app.use('/api/pacientes', pacientesRoutes);
-
-const pacientesAdultosRoutes = require('./routes/pacientesAdultos');
-app.use('/api/pacientes-adultos', pacientesAdultosRoutes);
-
-const valoracionIngresoAdultosLactanciaRoutes = require('./routes/valoracionIngresoAdultosLactancia');
-app.use('/api/valoracion-ingreso-adultos-lactancia', valoracionIngresoAdultosLactanciaRoutes);
-
-const consentimientoPerinatalRouter = require('./routes/consentimientoPerinatal');
-app.use('/api/consentimiento-perinatal', consentimientoPerinatalRouter);
-app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
-
-const uploadRoutes = require('./routes/upload');
-app.use('/api', uploadRoutes);
-
-// Servir frontend si lo necesitas (opcional)
+// Servir frontend (opcional, si no usas Nginx)
 // app.use(express.static(path.join(__dirname, '../centro-estimulacion/build')));
 // app.get('*', (req, res) => {
 //   res.sendFile(path.join(__dirname, '../centro-estimulacion/build', 'index.html'));
 // });
 
-
-
-
-
-// Inicia el servidor HTTPS
-//https.createServer(credentials, app).listen(4000, () => {
-  //console.log('Servidor HTTPS corriendo en el puerto 4000');
-//});
-
-// Levantar el servidor
+// Inicia el servidor
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });
