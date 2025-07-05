@@ -2,8 +2,34 @@ const express = require('express');
 const router = express.Router();
 const ValoracionIngreso = require('../models/ValoracionIngreso');
 
+// Middleware para validar que no se guarden imágenes base64
+const validarImagenes = (req, res, next) => {
+  const data = req.body;
+  const camposImagen = [
+    'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente', 'firmaFisioterapeuta', 
+    'firmaAutorizacion', 'consentimiento_firmaAcudiente', 'consentimiento_firmaFisio'
+  ];
+  
+  console.log('Validando imágenes en los datos recibidos...');
+  
+  for (const campo of camposImagen) {
+    if (data[campo] && data[campo].toString().startsWith('data:image')) {
+      console.error(`Error: Se está intentando guardar imagen base64 en el campo ${campo}`);
+      console.error(`Contenido del campo (primeros 50 caracteres): ${data[campo].substring(0, 50)}...`);
+      return res.status(400).json({ 
+        error: `El campo ${campo} contiene datos base64. Las imágenes deben subirse a S3 primero.` 
+      });
+    } else if (data[campo]) {
+      console.log(`Campo ${campo} válido: ${data[campo].substring(0, 50)}...`);
+    }
+  }
+  
+  console.log('Todas las imágenes son válidas (URLs de S3)');
+  next();
+};
+
 // Crear valoración
-router.post('/', async (req, res) => {
+router.post('/', validarImagenes, async (req, res) => {
   try {
     const nuevaValoracion = new ValoracionIngreso(req.body);
     await nuevaValoracion.save();
@@ -48,7 +74,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Actualizar una valoración por ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', validarImagenes, async (req, res) => {
   try {
     const actualizada = await ValoracionIngreso.findByIdAndUpdate(
       req.params.id,

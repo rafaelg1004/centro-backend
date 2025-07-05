@@ -38,6 +38,8 @@ router.delete('/delete-image', async (req, res) => {
   try {
     const { imageUrl } = req.body;
     
+    console.log('Recibida solicitud para eliminar imagen:', imageUrl);
+    
     if (!imageUrl) {
       return res.status(400).json({ error: 'URL de imagen requerida' });
     }
@@ -45,6 +47,8 @@ router.delete('/delete-image', async (req, res) => {
     // Extraer la key del objeto de la URL
     const url = new URL(imageUrl);
     const key = url.pathname.substring(1); // Remover el primer "/"
+    
+    console.log('Key extraída para eliminar:', key);
 
     // Crear comando para eliminar objeto
     const deleteCommand = new DeleteObjectCommand({
@@ -54,6 +58,8 @@ router.delete('/delete-image', async (req, res) => {
 
     // Ejecutar eliminación
     await s3Client.send(deleteCommand);
+    
+    console.log('Imagen eliminada exitosamente de S3:', key);
     
     res.json({ success: true, message: 'Imagen eliminada correctamente' });
   } catch (error) {
