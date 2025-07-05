@@ -9,9 +9,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
   
   const data = req.body;
   const camposImagen = [
-    'firmaPacientePrenatal',
     'firmaPaciente', 
-    'firmaFisioterapeuta',
     'firmaAutorizacion',
     'firmaPacienteSesion1',
     'firmaPacienteSesion2',
@@ -91,9 +89,70 @@ router.get('/:id', async (req, res) => {
 // Actualizar una valoración por ID
 router.put('/:id', bloquearImagenesBase64, async (req, res) => {
   try {
-    await Valoracion.findByIdAndUpdate(req.params.id, req.body);
-    res.json({ mensaje: 'Valoración actualizada exitosamente' });
+    // Obtener la valoración actual para comparar imágenes
+    const valoracionActual = await Valoracion.findById(req.params.id);
+    if (!valoracionActual) {
+      return res.status(404).json({ mensaje: 'Valoración no encontrada' });
+    }
+
+    console.log(`Actualizando valoración adultos lactancia ${req.params.id}...`);
+
+    // Lista de campos que pueden contener imágenes
+    const camposImagen = [
+      'firmaPacientePrenatal',
+      'firmaPaciente', 
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
+      'firmaPacienteSesion1',
+      'firmaPacienteSesion2',
+      'firmaFisioterapeutaPlanIntervencion',
+      'firmaFisioterapeutaPrenatal',
+      'firmaPacientePrenatalFinal',
+      'firmaConsentimientoLactancia',
+      'firmaProfesionalConsentimientoLactancia'
+    ];
+
+    // Importar función de eliminación
+    const { eliminarImagenDeS3 } = require('../utils/s3Utils');
+    
+    // Detectar imágenes que han cambiado y eliminar las anteriores
+    let imagenesEliminadas = 0;
+    for (const campo of camposImagen) {
+      const imagenAnterior = valoracionActual[campo];
+      const imagenNueva = req.body[campo];
+      
+      // Si había una imagen anterior y ahora es diferente (o se eliminó)
+      if (imagenAnterior && 
+          imagenAnterior.includes('amazonaws.com') && 
+          imagenAnterior !== imagenNueva) {
+        
+        console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
+        const resultado = await eliminarImagenDeS3(imagenAnterior);
+        if (resultado.success) {
+          imagenesEliminadas++;
+          console.log(`✓ Imagen anterior eliminada de ${campo}`);
+        } else {
+          console.error(`❌ Error eliminando imagen de ${campo}:`, resultado.error);
+        }
+      }
+    }
+
+    // Actualizar la valoración con los nuevos datos
+    const valoracionActualizada = await Valoracion.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { new: true }
+    );
+
+    console.log(`✓ Valoración actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
+    
+    res.json({ 
+      mensaje: 'Valoración actualizada exitosamente',
+      valoracion: valoracionActualizada,
+      imagenesAnterioresEliminadas: imagenesEliminadas
+    });
   } catch (error) {
+    console.error('Error al actualizar valoración:', error);
     res.status(500).json({ mensaje: 'Error al actualizar valoración', error });
   }
 });
@@ -110,9 +169,7 @@ router.delete('/:id', async (req, res) => {
 
     // Lista de campos que pueden contener imágenes en valoraciones de lactancia
     const camposImagen = [
-      'firmaPacientePrenatal',
       'firmaPaciente', 
-      'firmaFisioterapeuta',
       'firmaAutorizacion',
       'firmaPacienteSesion1',
       'firmaPacienteSesion2',

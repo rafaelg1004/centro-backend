@@ -92,14 +92,67 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
       return res.status(400).json({ mensaje: 'El campo paciente debe ser un ObjectId válido' });
     }
 
-    await Valoracion.findByIdAndUpdate(req.params.id, req.body, { runValidators: true, new: true });
-    res.json({ mensaje: 'Valoración actualizada exitosamente' });
+    // Obtener la valoración actual para comparar imágenes
+    const valoracionActual = await Valoracion.findById(req.params.id);
+    if (!valoracionActual) {
+      return res.status(404).json({ mensaje: 'Valoración no encontrada' });
+    }
+
+    console.log(`Actualizando valoración piso pélvico ${req.params.id}...`);
+
+    // Lista de campos que pueden contener imágenes
+    const camposImagen = [
+      'firmaPaciente',
+      'firmaFisioterapeuta', 
+      'firmaAutorizacion', 
+      'consentimientoFirma'
+    ];
+
+    // Importar función de eliminación
+    const { eliminarImagenDeS3 } = require('../utils/s3Utils');
+    
+    // Detectar imágenes que han cambiado y eliminar las anteriores
+    let imagenesEliminadas = 0;
+    for (const campo of camposImagen) {
+      const imagenAnterior = valoracionActual[campo];
+      const imagenNueva = req.body[campo];
+      
+      // Si había una imagen anterior y ahora es diferente (o se eliminó)
+      if (imagenAnterior && 
+          imagenAnterior.includes('amazonaws.com') && 
+          imagenAnterior !== imagenNueva) {
+        
+        console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
+        const resultado = await eliminarImagenDeS3(imagenAnterior);
+        if (resultado.success) {
+          imagenesEliminadas++;
+          console.log(`✓ Imagen anterior eliminada de ${campo}`);
+        } else {
+          console.error(`❌ Error eliminando imagen de ${campo}:`, resultado.error);
+        }
+      }
+    }
+
+    // Actualizar la valoración con los nuevos datos
+    const valoracionActualizada = await Valoracion.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { runValidators: true, new: true }
+    );
+
+    console.log(`✓ Valoración piso pélvico actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
+    
+    res.json({ 
+      mensaje: 'Valoración actualizada exitosamente',
+      valoracion: valoracionActualizada,
+      imagenesAnterioresEliminadas: imagenesEliminadas
+    });
   } catch (error) {
-    console.error('Error al actualizar valoración:', error); // <-- Esto muestra el error en consola
+    console.error('Error al actualizar valoración:', error);
     res.status(500).json({ 
       mensaje: 'Error al actualizar valoración', 
-      error: error.message, // Muestra el mensaje de error
-      stack: error.stack    // Opcional: muestra el stacktrace para depuración
+      error: error.message,
+      stack: error.stack
     });
   }
 });

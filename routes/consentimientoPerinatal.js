@@ -30,6 +30,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
     'firmaPacienteSesionIntensivo3'
   ];
   
+  // Verificar campos individuales
   for (const campo of camposImagen) {
     if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
       console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
@@ -37,6 +38,34 @@ const bloquearImagenesBase64 = (req, res, next) => {
         error: 'No se permiten imágenes base64 en la base de datos',
         mensaje: `El campo ${campo} contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
       });
+    }
+  }
+  
+  // Verificar imágenes en arrays de sesiones
+  if (data.sesiones && Array.isArray(data.sesiones)) {
+    for (let i = 0; i < data.sesiones.length; i++) {
+      const sesion = data.sesiones[i];
+      if (sesion.firmaPaciente && typeof sesion.firmaPaciente === 'string' && sesion.firmaPaciente.startsWith('data:image')) {
+        console.error(`❌ Intento de guardar imagen base64 en sesiones[${i}].firmaPaciente`);
+        return res.status(400).json({
+          error: 'No se permiten imágenes base64 en la base de datos',
+          mensaje: `El campo sesiones[${i}].firmaPaciente contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
+        });
+      }
+    }
+  }
+  
+  // Verificar imágenes en arrays de sesiones intensivo
+  if (data.sesionesIntensivo && Array.isArray(data.sesionesIntensivo)) {
+    for (let i = 0; i < data.sesionesIntensivo.length; i++) {
+      const sesion = data.sesionesIntensivo[i];
+      if (sesion.firmaPaciente && typeof sesion.firmaPaciente === 'string' && sesion.firmaPaciente.startsWith('data:image')) {
+        console.error(`❌ Intento de guardar imagen base64 en sesionesIntensivo[${i}].firmaPaciente`);
+        return res.status(400).json({
+          error: 'No se permiten imágenes base64 en la base de datos',
+          mensaje: `El campo sesionesIntensivo[${i}].firmaPaciente contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
+        });
+      }
     }
   }
   
@@ -127,14 +156,119 @@ router.get("/paciente/:pacienteId", async (req, res) => {
 // Actualizar consentimiento por ID
 router.put("/:id", bloquearImagenesBase64, async (req, res) => {
   try {
+    // Obtener el consentimiento actual para comparar imágenes
+    const consentimientoActual = await ConsentimientoPerinatal.findById(req.params.id);
+    if (!consentimientoActual) {
+      return res.status(404).json({ error: "Consentimiento no encontrado" });
+    }
+
+    console.log(`Actualizando consentimiento perinatal ${req.params.id}...`);
+
+    // Lista de campos que pueden contener imágenes
+    const camposImagen = [
+      'firmaPaciente',
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
+      'firmaPacienteConsentimiento',
+      'firmaFisioterapeutaConsentimiento',
+      'firmaPacienteGeneral',
+      'firmaFisioterapeutaGeneral',
+      'firmaPacienteGeneralIntensivo',
+      'firmaFisioterapeutaGeneralIntensivo',
+      // Firmas dinámicas de sesiones (Paso 7)
+      'firmaPacienteSesion1',
+      'firmaPacienteSesion2',
+      'firmaPacienteSesion3',
+      'firmaPacienteSesion4',
+      'firmaPacienteSesion5',
+      // Firmas dinámicas de sesiones intensivo (Paso 8)
+      'firmaPacienteSesionIntensivo1',
+      'firmaPacienteSesionIntensivo2',
+      'firmaPacienteSesionIntensivo3'
+    ];
+
+    // Importar función de eliminación
+    const { eliminarImagenDeS3, eliminarImagenesConsentimientoPerinatal } = require('../utils/s3Utils');
+    
+    // Detectar imágenes que han cambiado y eliminar las anteriores
+    let imagenesEliminadas = 0;
+    
+    // Primero verificar campos individuales
+    for (const campo of camposImagen) {
+      const imagenAnterior = consentimientoActual[campo];
+      const imagenNueva = req.body[campo];
+      
+      // Si había una imagen anterior y ahora es diferente (o se eliminó)
+      if (imagenAnterior && 
+          imagenAnterior.includes('amazonaws.com') && 
+          imagenAnterior !== imagenNueva) {
+        
+        console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
+        const resultado = await eliminarImagenDeS3(imagenAnterior);
+        if (resultado.success) {
+          imagenesEliminadas++;
+          console.log(`✓ Imagen anterior eliminada de ${campo}`);
+        } else {
+          console.error(`❌ Error eliminando imagen de ${campo}:`, resultado.error);
+        }
+      }
+    }
+
+    // También verificar arrays de sesiones
+    if (consentimientoActual.sesiones && Array.isArray(consentimientoActual.sesiones)) {
+      for (let i = 0; i < consentimientoActual.sesiones.length; i++) {
+        const sesionAnterior = consentimientoActual.sesiones[i];
+        const sesionNueva = req.body.sesiones && req.body.sesiones[i];
+        
+        if (sesionAnterior.firmaPaciente && 
+            sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
+            (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
+          
+          console.log(`Eliminando firma anterior de sesión ${i + 1}: ${sesionAnterior.firmaPaciente}`);
+          const resultado = await eliminarImagenDeS3(sesionAnterior.firmaPaciente);
+          if (resultado.success) {
+            imagenesEliminadas++;
+            console.log(`✓ Imagen anterior eliminada de sesión ${i + 1}`);
+          }
+        }
+      }
+    }
+
+    // Similar para sesionesIntensivo
+    if (consentimientoActual.sesionesIntensivo && Array.isArray(consentimientoActual.sesionesIntensivo)) {
+      for (let i = 0; i < consentimientoActual.sesionesIntensivo.length; i++) {
+        const sesionAnterior = consentimientoActual.sesionesIntensivo[i];
+        const sesionNueva = req.body.sesionesIntensivo && req.body.sesionesIntensivo[i];
+        
+        if (sesionAnterior.firmaPaciente && 
+            sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
+            (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
+          
+          console.log(`Eliminando firma anterior de sesión intensivo ${i + 1}: ${sesionAnterior.firmaPaciente}`);
+          const resultado = await eliminarImagenDeS3(sesionAnterior.firmaPaciente);
+          if (resultado.success) {
+            imagenesEliminadas++;
+            console.log(`✓ Imagen anterior eliminada de sesión intensivo ${i + 1}`);
+          }
+        }
+      }
+    }
+
+    // Actualizar el consentimiento con los nuevos datos
     const consentimientoActualizado = await ConsentimientoPerinatal.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
-    if (!consentimientoActualizado) return res.status(404).json({ error: "No encontrado" });
-    res.json(consentimientoActualizado);
+
+    console.log(`✓ Consentimiento perinatal actualizado. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
+    
+    res.json({
+      ...consentimientoActualizado.toObject(),
+      imagenesAnterioresEliminadas: imagenesEliminadas
+    });
   } catch (error) {
+    console.error('Error al actualizar consentimiento:', error);
     res.status(400).json({ error: error.message });
   }
 });

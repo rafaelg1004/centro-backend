@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const SesionPerinatalSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
   fecha: { type: String, required: true },
-  firmaPaciente: { type: String, required: true }, // Imagen base64
+  firmaPaciente: { type: String }, // URL de S3 (no required para permitir sesiones sin firma)
 });
 
 // Modelo principal
