@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ValoracionIngreso = require('../models/ValoracionIngreso');
+const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 
 // Middleware para validar que no se guarden imágenes base64
 const validarImagenes = (req, res, next) => {
@@ -63,12 +64,34 @@ router.get('/:id', async (req, res) => {
 // Eliminar una valoración
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await ValoracionIngreso.findByIdAndDelete(req.params.id);
-    if (!deleted) {
+    // Primero obtener la valoración para acceder a las imágenes
+    const valoracion = await ValoracionIngreso.findById(req.params.id);
+    if (!valoracion) {
       return res.status(404).json({ mensaje: "Valoración no encontrada" });
     }
-    res.json({ mensaje: "Valoración eliminada correctamente" });
+
+    console.log(`Eliminando valoración ${req.params.id} y sus imágenes asociadas...`);
+
+    // Lista de campos que pueden contener imágenes
+    const camposImagen = [
+      'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente', 
+      'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimiento_firmaAcudiente', 
+      'consentimiento_firmaFisio'
+    ];
+
+    // Eliminar todas las imágenes de S3
+    const resultadosEliminacion = await eliminarImagenesValoracion(valoracion, camposImagen);
+
+    // Eliminar la valoración de la base de datos
+    const deleted = await ValoracionIngreso.findByIdAndDelete(req.params.id);
+    
+    res.json({ 
+      mensaje: "Valoración eliminada correctamente",
+      imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
+      totalImagenes: resultadosEliminacion.length
+    });
   } catch (e) {
+    console.error('Error al eliminar valoración:', e);
     res.status(500).json({ error: e.message });
   }
 });

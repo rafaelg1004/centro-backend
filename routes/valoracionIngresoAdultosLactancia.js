@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Valoracion = require('../models/ValoracionIngresoAdultosLactancia');
+const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 
 // Crear nueva valoración
 router.post('/', async (req, res) => {
@@ -66,9 +67,33 @@ router.put('/:id', async (req, res) => {
 // Eliminar una valoración por ID
 router.delete('/:id', async (req, res) => {
   try {
+    // Primero obtener la valoración para acceder a las imágenes
+    const valoracion = await Valoracion.findById(req.params.id);
+    if (!valoracion) {
+      return res.status(404).json({ mensaje: "Valoración no encontrada" });
+    }
+
+    console.log(`Eliminando valoración adultos lactancia ${req.params.id} y sus imágenes asociadas...`);
+
+    // Lista de campos que pueden contener imágenes (ajustar según el modelo)
+    const camposImagen = [
+      'firmaFisioterapeuta', 'firmaAutorizacion', 'firmaConsentimiento'
+      // Agregar otros campos de imagen según tu modelo
+    ];
+
+    // Eliminar todas las imágenes de S3
+    const resultadosEliminacion = await eliminarImagenesValoracion(valoracion, camposImagen);
+
+    // Eliminar la valoración de la base de datos
     await Valoracion.findByIdAndDelete(req.params.id);
-    res.json({ mensaje: 'Valoración eliminada exitosamente' });
+    
+    res.json({ 
+      mensaje: 'Valoración eliminada exitosamente',
+      imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
+      totalImagenes: resultadosEliminacion.length
+    });
   } catch (error) {
+    console.error('Error al eliminar valoración adultos lactancia:', error);
     res.status(500).json({ mensaje: 'Error al eliminar valoración', error });
   }
 });
