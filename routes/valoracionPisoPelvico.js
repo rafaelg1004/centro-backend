@@ -3,8 +3,33 @@ const router = express.Router();
 const Valoracion = require('../models/ValoracionPisoPelvico');
 const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 
+// Middleware para bloquear imágenes base64
+const bloquearImagenesBase64 = (req, res, next) => {
+  console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
+  
+  const data = req.body;
+  const camposImagen = [
+    'firmaPaciente', 'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimientoFirma'
+  ];
+  
+  for (const campo of camposImagen) {
+    if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
+      console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
+      return res.status(400).json({
+        error: 'No se permiten imágenes base64 en la base de datos',
+        mensaje: `El campo ${campo} contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
+      });
+    }
+  }
+  
+  console.log('✓ Verificación de imágenes base64 completada');
+  next();
+};
+
+// ...existing code...
+
 // Crear nueva valoración
-router.post('/', async (req, res) => {
+router.post('/', bloquearImagenesBase64, async (req, res) => {
   try {
     const nuevaValoracion = new Valoracion(req.body);
     await nuevaValoracion.save();
@@ -56,7 +81,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Actualizar una valoración por ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', bloquearImagenesBase64, async (req, res) => {
   try {
     // Si paciente es un objeto, extrae solo el _id
     if (req.body.paciente && typeof req.body.paciente === "object" && req.body.paciente._id) {

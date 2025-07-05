@@ -1,9 +1,46 @@
 const express = require("express");
 const router = express.Router();
 const ConsentimientoPerinatal = require("../models/ConsentimientoPerinatal");
+const { eliminarImagenesValoracion } = require('../utils/s3Utils');
+
+// Middleware para bloquear imágenes base64
+const bloquearImagenesBase64 = (req, res, next) => {
+  console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
+  
+  const data = req.body;
+  const camposImagen = [
+    'firmaPaciente',
+    'firmaFisioterapeuta',
+    'firmaAutorizacion',
+    'firmaPacienteGeneral',
+    'firmaConsentimientoFisico',
+    'firmaProfesionalConsentimientoFisico',
+    'firmaConsentimientoEducacion',
+    'firmaProfesionalConsentimientoEducacion',
+    'firmaConsentimientoIntensivo',
+    'firmaProfesionalConsentimientoIntensivo'
+  ];
+  
+  for (const campo of camposImagen) {
+    if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
+      console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
+      return res.status(400).json({
+        error: 'No se permiten imágenes base64 en la base de datos',
+        mensaje: `El campo ${campo} contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
+      });
+    }
+  }
+  
+  console.log('✓ Verificación de imágenes base64 completada');
+  next();
+};
+
+// ...existing code...
+
+// ...existing code...
 
 // Crear un nuevo consentimiento perinatal
-router.post("/", async (req, res) => {
+router.post("/", bloquearImagenesBase64, async (req, res) => {
   try {
     console.log("Datos recibidos en el backend:", req.body); // <-- Ya lo tienes
     const nuevoConsentimiento = new ConsentimientoPerinatal(req.body);
@@ -79,7 +116,7 @@ router.get("/paciente/:pacienteId", async (req, res) => {
 });
 
 // Actualizar consentimiento por ID
-router.put("/:id", async (req, res) => {
+router.put("/:id", bloquearImagenesBase64, async (req, res) => {
   try {
     const consentimientoActualizado = await ConsentimientoPerinatal.findByIdAndUpdate(
       req.params.id,
@@ -96,10 +133,41 @@ router.put("/:id", async (req, res) => {
 // Eliminar consentimiento por ID
 router.delete("/:id", async (req, res) => {
   try {
-    const consentimientoEliminado = await ConsentimientoPerinatal.findByIdAndDelete(req.params.id);
-    if (!consentimientoEliminado) return res.status(404).json({ error: "No encontrado" });
-    res.json({ mensaje: "Consentimiento eliminado" });
+    // Primero obtener el consentimiento para acceder a las imágenes
+    const consentimiento = await ConsentimientoPerinatal.findById(req.params.id);
+    if (!consentimiento) {
+      return res.status(404).json({ error: "Consentimiento no encontrado" });
+    }
+
+    console.log(`Eliminando consentimiento perinatal ${req.params.id} y sus imágenes asociadas...`);
+
+    // Lista de campos que pueden contener imágenes en consentimientos perinatales
+    const camposImagen = [
+      'firmaPaciente',
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
+      'firmaPacienteGeneral',
+      'firmaConsentimientoFisico',
+      'firmaProfesionalConsentimientoFisico',
+      'firmaConsentimientoEducacion',
+      'firmaProfesionalConsentimientoEducacion',
+      'firmaConsentimientoIntensivo',
+      'firmaProfesionalConsentimientoIntensivo'
+    ];
+
+    // Eliminar todas las imágenes de S3
+    const resultadosEliminacion = await eliminarImagenesValoracion(consentimiento, camposImagen);
+
+    // Eliminar el consentimiento de la base de datos
+    await ConsentimientoPerinatal.findByIdAndDelete(req.params.id);
+    
+    res.json({ 
+      mensaje: 'Consentimiento eliminado exitosamente',
+      imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
+      totalImagenes: resultadosEliminacion.length
+    });
   } catch (error) {
+    console.error('Error al eliminar consentimiento perinatal:', error);
     res.status(500).json({ error: error.message });
   }
 });

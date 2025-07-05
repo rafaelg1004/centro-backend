@@ -3,8 +3,41 @@ const router = express.Router();
 const Valoracion = require('../models/ValoracionIngresoAdultosLactancia');
 const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 
+// Middleware para bloquear imágenes base64
+const bloquearImagenesBase64 = (req, res, next) => {
+  console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
+  
+  const data = req.body;
+  const camposImagen = [
+    'firmaPacientePrenatal',
+    'firmaPaciente', 
+    'firmaFisioterapeuta',
+    'firmaAutorizacion',
+    'firmaPacienteSesion1',
+    'firmaPacienteSesion2',
+    'firmaFisioterapeutaPlanIntervencion',
+    'firmaFisioterapeutaPrenatal',
+    'firmaPacientePrenatalFinal',
+    'firmaConsentimientoLactancia',
+    'firmaProfesionalConsentimientoLactancia'
+  ];
+  
+  for (const campo of camposImagen) {
+    if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
+      console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
+      return res.status(400).json({
+        error: 'No se permiten imágenes base64 en la base de datos',
+        mensaje: `El campo ${campo} contiene una imagen base64. Debe convertirse a URL de S3 antes de guardar.`
+      });
+    }
+  }
+  
+  console.log('✓ Verificación de imágenes base64 completada');
+  next();
+};
+
 // Crear nueva valoración
-router.post('/', async (req, res) => {
+router.post('/', bloquearImagenesBase64, async (req, res) => {
   try {
     const nuevaValoracion = new Valoracion(req.body);
     await nuevaValoracion.save();
@@ -56,7 +89,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Actualizar una valoración por ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', bloquearImagenesBase64, async (req, res) => {
   try {
     await Valoracion.findByIdAndUpdate(req.params.id, req.body);
     res.json({ mensaje: 'Valoración actualizada exitosamente' });
@@ -75,10 +108,19 @@ router.delete('/:id', async (req, res) => {
 
     console.log(`Eliminando valoración adultos lactancia ${req.params.id} y sus imágenes asociadas...`);
 
-    // Lista de campos que pueden contener imágenes (ajustar según el modelo)
+    // Lista de campos que pueden contener imágenes en valoraciones de lactancia
     const camposImagen = [
-      'firmaFisioterapeuta', 'firmaAutorizacion', 'firmaConsentimiento'
-      // Agregar otros campos de imagen según tu modelo
+      'firmaPacientePrenatal',
+      'firmaPaciente', 
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
+      'firmaPacienteSesion1',
+      'firmaPacienteSesion2',
+      'firmaFisioterapeutaPlanIntervencion',
+      'firmaFisioterapeutaPrenatal',
+      'firmaPacientePrenatalFinal',
+      'firmaConsentimientoLactancia',
+      'firmaProfesionalConsentimientoLactancia'
     ];
 
     // Eliminar todas las imágenes de S3
