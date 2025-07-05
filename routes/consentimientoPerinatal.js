@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const ConsentimientoPerinatal = require("../models/ConsentimientoPerinatal");
-const { eliminarImagenesValoracion } = require('../utils/s3Utils');
+const { eliminarImagenesConsentimientoPerinatal } = require('../utils/s3Utils');
 
 // Middleware para bloquear imágenes base64
 const bloquearImagenesBase64 = (req, res, next) => {
@@ -12,13 +12,22 @@ const bloquearImagenesBase64 = (req, res, next) => {
     'firmaPaciente',
     'firmaFisioterapeuta',
     'firmaAutorizacion',
+    'firmaPacienteConsentimiento',
+    'firmaFisioterapeutaConsentimiento',
     'firmaPacienteGeneral',
-    'firmaConsentimientoFisico',
-    'firmaProfesionalConsentimientoFisico',
-    'firmaConsentimientoEducacion',
-    'firmaProfesionalConsentimientoEducacion',
-    'firmaConsentimientoIntensivo',
-    'firmaProfesionalConsentimientoIntensivo'
+    'firmaFisioterapeutaGeneral',
+    'firmaPacienteGeneralIntensivo',
+    'firmaFisioterapeutaGeneralIntensivo',
+    // Firmas dinámicas de sesiones (Paso 7)
+    'firmaPacienteSesion1',
+    'firmaPacienteSesion2',
+    'firmaPacienteSesion3',
+    'firmaPacienteSesion4',
+    'firmaPacienteSesion5',
+    // Firmas dinámicas de sesiones intensivo (Paso 8)
+    'firmaPacienteSesionIntensivo1',
+    'firmaPacienteSesionIntensivo2',
+    'firmaPacienteSesionIntensivo3'
   ];
   
   for (const campo of camposImagen) {
@@ -146,17 +155,26 @@ router.delete("/:id", async (req, res) => {
       'firmaPaciente',
       'firmaFisioterapeuta',
       'firmaAutorizacion',
+      'firmaPacienteConsentimiento',
+      'firmaFisioterapeutaConsentimiento',
       'firmaPacienteGeneral',
-      'firmaConsentimientoFisico',
-      'firmaProfesionalConsentimientoFisico',
-      'firmaConsentimientoEducacion',
-      'firmaProfesionalConsentimientoEducacion',
-      'firmaConsentimientoIntensivo',
-      'firmaProfesionalConsentimientoIntensivo'
+      'firmaFisioterapeutaGeneral',
+      'firmaPacienteGeneralIntensivo',
+      'firmaFisioterapeutaGeneralIntensivo',
+      // Firmas dinámicas de sesiones (Paso 7)
+      'firmaPacienteSesion1',
+      'firmaPacienteSesion2',
+      'firmaPacienteSesion3',
+      'firmaPacienteSesion4',
+      'firmaPacienteSesion5',
+      // Firmas dinámicas de sesiones intensivo (Paso 8)
+      'firmaPacienteSesionIntensivo1',
+      'firmaPacienteSesionIntensivo2',
+      'firmaPacienteSesionIntensivo3'
     ];
 
-    // Eliminar todas las imágenes de S3
-    const resultadosEliminacion = await eliminarImagenesValoracion(consentimiento, camposImagen);
+    // Eliminar todas las imágenes de S3 (incluyendo arrays de sesiones)
+    const resultadosEliminacion = await eliminarImagenesConsentimientoPerinatal(consentimiento, camposImagen);
 
     // Eliminar el consentimiento de la base de datos
     await ConsentimientoPerinatal.findByIdAndDelete(req.params.id);

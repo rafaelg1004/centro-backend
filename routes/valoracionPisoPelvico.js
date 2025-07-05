@@ -32,8 +32,8 @@ const bloquearImagenesBase64 = (req, res, next) => {
 router.post('/', bloquearImagenesBase64, async (req, res) => {
   try {
     const nuevaValoracion = new Valoracion(req.body);
-    await nuevaValoracion.save();
-    res.status(201).json({ mensaje: 'Valoración guardada exitosamente' });
+    const valoracionGuardada = await nuevaValoracion.save();
+    res.status(201).json(valoracionGuardada);
   } catch (error) {
     console.error('Error al guardar valoración:', error);
     res.status(500).json({ mensaje: 'Error al guardar valoración', error });
@@ -117,8 +117,10 @@ router.delete('/:id', async (req, res) => {
 
     // Lista de campos que pueden contener imágenes (ajustar según el modelo)
     const camposImagen = [
-      'firmaFisioterapeuta', 'firmaAutorizacion', 'firmaConsentimiento'
-      // Agregar otros campos de imagen según tu modelo
+      'firmaPaciente',
+      'firmaFisioterapeuta', 
+      'firmaAutorizacion', 
+      'consentimientoFirma'
     ];
 
     // Eliminar todas las imágenes de S3

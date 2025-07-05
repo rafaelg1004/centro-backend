@@ -52,8 +52,52 @@ async function eliminarImagenesValoracion(valoracion, camposImagen) {
   return resultadosEliminacion;
 }
 
+// Función especial para eliminar todas las imágenes de un consentimiento perinatal
+async function eliminarImagenesConsentimientoPerinatal(consentimiento, camposImagen) {
+  console.log(`Eliminando imágenes de consentimiento perinatal...`);
+
+  const resultadosEliminacion = [];
+  
+  // Eliminar imágenes de campos directos
+  for (const campo of camposImagen) {
+    if (consentimiento[campo] && consentimiento[campo].includes('amazonaws.com')) {
+      console.log(`Eliminando imagen del campo ${campo}: ${consentimiento[campo]}`);
+      const resultado = await eliminarImagenDeS3(consentimiento[campo]);
+      resultadosEliminacion.push({ campo, resultado });
+    }
+  }
+
+  // Eliminar imágenes de arrays de sesiones
+  if (consentimiento.sesiones && Array.isArray(consentimiento.sesiones)) {
+    for (let i = 0; i < consentimiento.sesiones.length; i++) {
+      const sesion = consentimiento.sesiones[i];
+      if (sesion.firmaPaciente && sesion.firmaPaciente.includes('amazonaws.com')) {
+        console.log(`Eliminando firma de sesión ${i + 1}: ${sesion.firmaPaciente}`);
+        const resultado = await eliminarImagenDeS3(sesion.firmaPaciente);
+        resultadosEliminacion.push({ campo: `sesiones[${i}].firmaPaciente`, resultado });
+      }
+    }
+  }
+
+  // Eliminar imágenes de arrays de sesiones intensivo
+  if (consentimiento.sesionesIntensivo && Array.isArray(consentimiento.sesionesIntensivo)) {
+    for (let i = 0; i < consentimiento.sesionesIntensivo.length; i++) {
+      const sesion = consentimiento.sesionesIntensivo[i];
+      if (sesion.firmaPaciente && sesion.firmaPaciente.includes('amazonaws.com')) {
+        console.log(`Eliminando firma de sesión intensivo ${i + 1}: ${sesion.firmaPaciente}`);
+        const resultado = await eliminarImagenDeS3(sesion.firmaPaciente);
+        resultadosEliminacion.push({ campo: `sesionesIntensivo[${i}].firmaPaciente`, resultado });
+      }
+    }
+  }
+
+  console.log(`✓ Imágenes de consentimiento perinatal procesadas:`, resultadosEliminacion);
+  return resultadosEliminacion;
+}
+
 module.exports = {
   eliminarImagenDeS3,
   eliminarImagenesValoracion,
+  eliminarImagenesConsentimientoPerinatal,
   s3Client
 };

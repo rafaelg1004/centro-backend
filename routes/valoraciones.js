@@ -33,8 +33,8 @@ const validarImagenes = (req, res, next) => {
 router.post('/', validarImagenes, async (req, res) => {
   try {
     const nuevaValoracion = new ValoracionIngreso(req.body);
-    await nuevaValoracion.save();
-    res.status(201).json({ mensaje: 'Valoración guardada correctamente' });
+    const valoracionGuardada = await nuevaValoracion.save();
+    res.status(201).json(valoracionGuardada);
   } catch (error) {
     console.error('Error al guardar valoración:', error);
     res.status(500).json({ mensaje: 'Error en el servidor', error });
