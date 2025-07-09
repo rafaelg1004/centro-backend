@@ -32,6 +32,41 @@ const validarImagenes = (req, res, next) => {
 // Crear valoración
 router.post('/', validarImagenes, async (req, res) => {
   try {
+    console.log('=== DEPURACIÓN DE DATOS RECIBIDOS ===');
+    console.log('rutinaDiaria recibido:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
+    
+    // Asegurar que todos los campos de texto sean strings
+    const camposTexto = [
+      'rutinaDiaria', 'motivoDeConsulta', 'descripcionSueno', 'motivoComida',
+      'problemasSueno', 'duermeCon', 'patronSueno', 'pesadillas', 'siesta',
+      'detalleProblemasComer', 'alimentosPreferidos', 'alimentosNoLeGustan',
+      'permaneceCon', 'prefiereA', 'relacionHermanos', 'emociones', 'juegaCon',
+      'juegosPreferidos', 'relacionDesconocidos'
+    ];
+    
+    // Limpiar y validar cada campo
+    camposTexto.forEach(campo => {
+      if (req.body[campo] !== undefined) {
+        if (Array.isArray(req.body[campo])) {
+          console.log(`⚠️ Campo ${campo} es array, convirtiendo a string:`, req.body[campo]);
+          req.body[campo] = req.body[campo].join(', ');
+        } else if (typeof req.body[campo] === 'object' && req.body[campo] !== null) {
+          console.log(`⚠️ Campo ${campo} es objeto, convirtiendo a string:`, req.body[campo]);
+          req.body[campo] = JSON.stringify(req.body[campo]);
+        } else if (typeof req.body[campo] !== 'string') {
+          console.log(`⚠️ Campo ${campo} no es string, convirtiendo:`, typeof req.body[campo], req.body[campo]);
+          req.body[campo] = String(req.body[campo]);
+        }
+        
+        // Asegurar que strings vacíos queden como strings vacíos
+        if (req.body[campo] === 'undefined' || req.body[campo] === 'null') {
+          req.body[campo] = '';
+        }
+      }
+    });
+    
+    console.log('rutinaDiaria después de limpieza:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
+    
     const nuevaValoracion = new ValoracionIngreso(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
     res.status(201).json(valoracionGuardada);
