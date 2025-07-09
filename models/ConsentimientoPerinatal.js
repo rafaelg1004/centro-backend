@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 // Sesiones del programa perinatal (10 sesiones)
 const SesionPerinatalSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
-  fecha: { type: String, required: true },
+  fecha: { type: String, required: false }, // No required - puede estar vacía
   firmaPaciente: { type: String }, // URL de S3 (no required para permitir sesiones sin firma)
 });
 
@@ -125,7 +125,7 @@ const ConsentimientoPerinatalSchema = new mongoose.Schema({
   firmaFisioterapeutaConsentimiento: String,
 
   // Paso 7: Consentimiento educación perinatal (10 sesiones)
-  sesiones: { type: [SesionPerinatalSchema], required: true }, // 10 sesiones con fecha y firma paciente
+  sesiones: { type: [SesionPerinatalSchema], default: [] }, // Array de sesiones (puede estar vacío)
   firmaPacienteGeneral: { type: String, required: true }, // Firma general paciente
   firmaFisioterapeutaGeneral: { type: String, required: true }, // Firma general fisioterapeuta
 

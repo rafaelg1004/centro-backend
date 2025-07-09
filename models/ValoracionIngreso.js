@@ -53,33 +53,116 @@ const ValoracionIngresoSchema = new mongoose.Schema({
   juegaCon: String,
   juegosPreferidos: String,
   relacionDesconocidos: String,
-  rutinaDiaria: [
-    {
-      desde: String,
-      hasta: String,
-      actividad: String
-    }
-  ],
+  rutinaDiaria: String,
 
-  // Paso 4
-  ontologico_ControlCefalico_si: Boolean,
-  tiempo_ControlCefalico: String,
-  observaciones_ControlCefalico: String,
-  ontologico_Rolados_si: Boolean,
-  tiempo_Rolados: String,
-  observaciones_Rolados: String,
-  ontologico_Sedente_si: Boolean,
-  tiempo_Sedente: String,
-  observaciones_Sedente: String,
-  ontologico_Gateo_si: Boolean,
-  tiempo_Gateo: String,
-  observaciones_Gateo: String,
-  ontologico_Bipedo_si: Boolean,
-  tiempo_Bipedo: String,
-  observaciones_Bipedo: String,
-  ontologico_Marcha_si: Boolean,
-  tiempo_Marcha: String,
-  observaciones_Marcha: String,
+  // Paso 4 - Desarrollo Ontológico
+  // Motricidad Gruesa
+  sostieneCabeza_si: Boolean,
+  sostieneCabeza_no: Boolean,
+  sostieneCabeza_observaciones: String,
+  
+  seVoltea_si: Boolean,
+  seVoltea_no: Boolean,
+  seVoltea_observaciones: String,
+  
+  seSientaSinApoyo_si: Boolean,
+  seSientaSinApoyo_no: Boolean,
+  seSientaSinApoyo_observaciones: String,
+  
+  gatea_si: Boolean,
+  gatea_no: Boolean,
+  gatea_observaciones: String,
+  
+  sePoneDePerApoyado_si: Boolean,
+  sePoneDePerApoyado_no: Boolean,
+  sePoneDePerApoyado_observaciones: String,
+  
+  caminaSolo_si: Boolean,
+  caminaSolo_no: Boolean,
+  caminaSolo_observaciones: String,
+  
+  correSalta_si: Boolean,
+  correSalta_no: Boolean,
+  correSalta_observaciones: String,
+
+  // Motricidad Fina
+  sigueObjetosMirada_si: Boolean,
+  sigueObjetosMirada_no: Boolean,
+  sigueObjetosMirada_observaciones: String,
+  
+  llevaObjetosBoca_si: Boolean,
+  llevaObjetosBoca_no: Boolean,
+  llevaObjetosBoca_observaciones: String,
+  
+  pasaObjetosEntreManos_si: Boolean,
+  pasaObjetosEntreManos_no: Boolean,
+  pasaObjetosEntreManos_observaciones: String,
+  
+  pinzaSuperior_si: Boolean,
+  pinzaSuperior_no: Boolean,
+  pinzaSuperior_observaciones: String,
+  
+  encajaPiezasGrandes_si: Boolean,
+  encajaPiezasGrandes_no: Boolean,
+  encajaPiezasGrandes_observaciones: String,
+  
+  dibujaGarabatos_si: Boolean,
+  dibujaGarabatos_no: Boolean,
+  dibujaGarabatos_observaciones: String,
+
+  // Lenguaje y Comunicación
+  balbucea_si: Boolean,
+  balbucea_no: Boolean,
+  balbucea_observaciones: String,
+  
+  diceMamaPapa_si: Boolean,
+  diceMamaPapa_no: Boolean,
+  diceMamaPapa_observaciones: String,
+  
+  senalaQueQuiere_si: Boolean,
+  senalaQueQuiere_no: Boolean,
+  senalaQueQuiere_observaciones: String,
+  
+  dice5a10Palabras_si: Boolean,
+  dice5a10Palabras_no: Boolean,
+  dice5a10Palabras_observaciones: String,
+  
+  entiendeOrdenesSimples_si: Boolean,
+  entiendeOrdenesSimples_no: Boolean,
+  entiendeOrdenesSimples_observaciones: String,
+  
+  usaFrases2Palabras_si: Boolean,
+  usaFrases2Palabras_no: Boolean,
+  usaFrases2Palabras_observaciones: String,
+
+  // Socioemocional
+  sonrieSocialmente_si: Boolean,
+  sonrieSocialmente_no: Boolean,
+  sonrieSocialmente_observaciones: String,
+  
+  respondeNombre_si: Boolean,
+  respondeNombre_no: Boolean,
+  respondeNombre_observaciones: String,
+  
+  interesaOtrosNinos_si: Boolean,
+  interesaOtrosNinos_no: Boolean,
+  interesaOtrosNinos_observaciones: String,
+  
+  juegoSimbolico_si: Boolean,
+  juegoSimbolico_no: Boolean,
+  juegoSimbolico_observaciones: String,
+  
+  seDespideLanzaBesos_si: Boolean,
+  seDespideLanzaBesos_no: Boolean,
+  seDespideLanzaBesos_observaciones: String,
+
+  // Conclusión General
+  nivelDesarrolloAcorde_si: Boolean,
+  nivelDesarrolloAcorde_no: Boolean,
+  areasRequierenAcompanamiento: String,
+  actividadesSugeridasCasa: String,
+  estimulacionEntornoDiario: String,
+  seguimientoSugeridoFecha: String,
 
   frecuenciaCardiaca: String,
   frecuenciaRespiratoria: String,
@@ -98,9 +181,9 @@ const ValoracionIngresoSchema = new mongoose.Schema({
   sistemaPulmonar: String,
   problemasAsociados: String,
 
-  // Paso 5
-  diagnostico: String,
-  planTratamiento: String,
+  // Paso 5 - Diagnóstico Fisioterapéutico y Plan de Tratamiento
+  diagnosticoFisioterapeutico: String, // "opcion1" o "opcion2"
+  planTratamiento: String, // "opcion1" o "opcion2"
 
   // Paso 6 - Firmas
   nombreAcudiente: String,
@@ -118,7 +201,7 @@ const ValoracionIngresoSchema = new mongoose.Schema({
   mesFirma: String,
   anioFirma: String,
   cedulaAutorizacion: String,
-  firmaAutorizacion: String, // base64
+  firmaAutorizacion: String, // base64 - solo del paciente/acudiente
 
   // Paso 8 - Consentimiento informado
   consentimiento_nombreAcudiente: String,
