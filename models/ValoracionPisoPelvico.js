@@ -61,6 +61,9 @@ const ligEndopelvicos = [
 
 const ValoracionPisoPelvicoSchema = new mongoose.Schema({
   paciente: { type: mongoose.Schema.Types.ObjectId, ref: "PacienteAdulto", required: true },
+  
+  // Datos específicos de esta valoración (NO del paciente)
+  // Los siguientes campos YA están en PacienteAdulto: acompanante, telefonoAcompanante, nombreBebe, semanasGestacion, fum, fechaProbableParto
   fecha: String,
   hora: String,
   motivoConsulta: String,
@@ -74,6 +77,7 @@ const ValoracionPisoPelvicoSchema = new mongoose.Schema({
   talla: String,
   imc: String,
   deporteActual: String,
+  observacionesActividad: String,
   observacionesAvd: String,
   infoMedicacion: String,
   farmacoOtros: String,

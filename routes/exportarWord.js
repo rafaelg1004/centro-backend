@@ -64,60 +64,13 @@ router.post("/exportar-word", async (req, res) => {
 
     doc.render(data);
 
-    // Guarda el Word temporalmente
-    const filename = `valoracion_${Date.now()}`;
-    const docxPath = path.join(tempDir, `${filename}.docx`);
-    const pdfPath = path.join(tempDir, `${filename}.pdf`);
-    fs.writeFileSync(docxPath, doc.getZip().generate({ type: "nodebuffer" }));
+    // Generar el archivo Word directamente
+    const docxBuffer = doc.getZip().generate({ type: "nodebuffer" });
 
-    // Convierte el Word a PDF usando LibreOffice
-    execSync(`soffice --headless --convert-to pdf --outdir "${tempDir}" "${docxPath}"`);
-
-    // Lee el PDF generado
-    let pdfBuffer = fs.readFileSync(pdfPath);
-
-    // --- AGREGAR FIRMAS AL PDF ---
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
-    const pages = pdfDoc.getPages();
-    const totalPages = pages.length;
-
-    // Firma profesional y representante en la penúltima página
-    if (totalPages >= 2) {
-      const penultima = pages[totalPages - 2];
-      if (data.firmaProfesional) {
-        const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaProfesional.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 100, y: 230, width: 150, height: 50 });
-      }
-      if (data.firmaRepresentante) {
-        const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaRepresentante.split(",")[1], "base64"));
-        penultima.drawImage(firmaImg, { x: 350, y: 230, width: 150, height: 50 });
-      }
-    }
-
-    // Firma autorización en la última página
-    if (totalPages >= 1 && data.firmaAutorizacion) {
-      const ultima = pages[totalPages - 1];
-      const firmaImg = await pdfDoc.embedPng(Buffer.from(data.firmaAutorizacion.split(",")[1], "base64"));
-      ultima.drawImage(firmaImg, { x: 50, y: 350, width: 150, height: 50 });
-      ultima.drawText("Firma Autorización", {
-        x: 50,
-        y: 340,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    pdfBuffer = await pdfDoc.save();
-    // --- FIN AGREGAR FIRMAS ---
-
-    // Enviar el PDF al frontend
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=valoracion.pdf");
-    res.send(pdfBuffer);
-
-    // Limpieza de archivos temporales
-    fs.unlinkSync(docxPath);
-    fs.unlinkSync(pdfPath);
+    // Enviar el archivo Word al frontend
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", "attachment; filename=valoracion.docx");
+    res.send(docxBuffer);
 
   } catch (error) {
     console.error("❌ Error al generar docx o PDF:", error);

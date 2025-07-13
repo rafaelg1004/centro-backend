@@ -33,6 +33,8 @@ const Paciente = require('./models/Paciente');
 // Rutas
 app.use("/api", require("./routes/exportarWord"));
 app.use("/api", require("./routes/exportar-pdf"));
+app.use("/api", require("./routes/proxy-images"));
+app.use("/api", require("./routes/proxyImages"));
 app.use("/api/clases", require("./routes/clases"));
 app.use('/api/pagoPaquete', require('./routes/pagoPaquetes'));
 app.use('/api/auth', require('./routes/auth'));
@@ -320,6 +322,78 @@ app.get('/api/debug-valoraciones/:id', async (req, res) => {
     
   } catch (error) {
     console.error('Error obteniendo valoración:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Para debugging también del GET (obtener valoración piso pélvico)
+app.get('/api/debug-valoracion-piso-pelvico/:id', async (req, res) => {
+  console.log('\n=== DEBUG: OBTENER VALORACIÓN PISO PÉLVICO ===');
+  console.log('ID solicitado:', req.params.id);
+  
+  try {
+    // Obtener la valoración real
+    const ValoracionPisoPelvico = require('./models/ValoracionPisoPelvico');
+    const valoracion = await ValoracionPisoPelvico.findById(req.params.id).populate('paciente');
+    
+    if (!valoracion) {
+      console.log('❌ Valoración no encontrada');
+      return res.status(404).json({ error: 'Valoración no encontrada' });
+    }
+    
+    console.log('✅ Valoración encontrada');
+    console.log('Paciente:', valoracion.paciente?.nombres || 'Sin nombre');
+    console.log('Fecha:', valoracion.fecha);
+    console.log('Campos totales:', Object.keys(valoracion.toObject()).length);
+    
+    // Verificar firmas
+    const camposFirmas = [
+      'firmaPaciente', 'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimientoFirma'
+    ];
+    
+    console.log('Firmas en BD:');
+    camposFirmas.forEach(campo => {
+      if (valoracion[campo]) {
+        console.log(`✅ ${campo}: ${valoracion[campo].substring(0, 50)}...`);
+      } else {
+        console.log(`❌ ${campo}: vacío`);
+      }
+    });
+    
+    res.json(valoracion);
+    
+  } catch (error) {
+    console.error('Error obteniendo valoración piso pélvico:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Listar todas las valoraciones piso pélvico para verificar IDs
+app.get('/api/debug-list-valoraciones-piso-pelvico', async (req, res) => {
+  console.log('\n=== DEBUG: LISTAR VALORACIONES PISO PÉLVICO ===');
+  
+  try {
+    const ValoracionPisoPelvico = require('./models/ValoracionPisoPelvico');
+    const valoraciones = await ValoracionPisoPelvico.find().populate('paciente');
+    
+    console.log(`Total de valoraciones: ${valoraciones.length}`);
+    
+    valoraciones.forEach((v, index) => {
+      console.log(`${index + 1}. ID: ${v._id} - Paciente: ${v.paciente?.nombres || 'Sin nombre'} - Fecha: ${v.fecha || 'Sin fecha'}`);
+    });
+    
+    res.json({
+      total: valoraciones.length,
+      valoraciones: valoraciones.map(v => ({
+        _id: v._id,
+        paciente: v.paciente?.nombres || 'Sin nombre',
+        fecha: v.fecha,
+        motivoConsulta: v.motivoConsulta
+      }))
+    });
+    
+  } catch (error) {
+    console.error('Error listando valoraciones piso pélvico:', error);
     res.status(500).json({ error: error.message });
   }
 });

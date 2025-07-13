@@ -31,52 +31,128 @@ const bloquearImagenesBase64 = (req, res, next) => {
 // Crear nueva valoración
 router.post('/', bloquearImagenesBase64, async (req, res) => {
   try {
+    console.log('Datos recibidos para nueva valoración piso pélvico:', {
+      paciente: req.body.paciente,
+      nombres: req.body.nombres,
+      cedula: req.body.cedula
+    });
+
+    // Validar que se envíe el ID del paciente
+    if (!req.body.paciente) {
+      return res.status(400).json({ 
+        mensaje: 'El campo paciente es obligatorio',
+        error: 'PACIENTE_REQUERIDO'
+      });
+    }
+
+    // Validar que el ID del paciente sea válido
+    if (!req.body.paciente.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ 
+        mensaje: 'El ID del paciente no es válido',
+        error: 'PACIENTE_ID_INVALIDO'
+      });
+    }
+
+    // Verificar que el paciente adulto existe
+    const PacienteAdulto = require('../models/PacienteAdulto');
+    const pacienteExiste = await PacienteAdulto.findById(req.body.paciente);
+    if (!pacienteExiste) {
+      return res.status(404).json({ 
+        mensaje: 'El paciente adulto no existe',
+        error: 'PACIENTE_NO_ENCONTRADO'
+      });
+    }
+
     const nuevaValoracion = new Valoracion(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
+    
+    console.log('✓ Valoración piso pélvico guardada exitosamente:', valoracionGuardada._id);
     res.status(201).json(valoracionGuardada);
   } catch (error) {
-    console.error('Error al guardar valoración:', error);
-    res.status(500).json({ mensaje: 'Error al guardar valoración', error });
+    console.error('Error al guardar valoración piso pélvico:', error);
+    res.status(500).json({ mensaje: 'Error al guardar valoración', error: error.message });
   }
 });
 
 // Obtener todas las valoraciones
 router.get('/', async (req, res) => {
   try {
-    const valoraciones = await Valoracion.find();
+    console.log('Obteniendo todas las valoraciones piso pélvico...');
+    
+    const valoraciones = await Valoracion.find()
+      .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    console.log(`✓ Encontradas ${valoraciones.length} valoraciones piso pélvico`);
     res.json(valoraciones);
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al obtener valoraciones', error });
+    console.error('Error al obtener valoraciones piso pélvico:', error);
+    res.status(500).json({ mensaje: 'Error al obtener valoraciones', error: error.message });
   }
 });
 
-// Búsqueda general por nombre o cédula
+// Búsqueda general por nombre o cédula del paciente
 router.get('/buscar', async (req, res) => {
   const { q } = req.query;
   try {
     if (!q || q.trim() === "") {
-      return res.json([]);
+      // Si no hay búsqueda, devolver todas las valoraciones con datos del paciente
+      const valoraciones = await Valoracion.find()
+        .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
+        .sort({ createdAt: -1 })
+        .limit(50);
+      return res.json(valoraciones);
     }
-    const valoraciones = await Valoracion.find({
+    
+    // Buscar pacientes que coincidan con la búsqueda
+    const PacienteAdulto = require('../models/PacienteAdulto');
+    const pacientesCoincidentes = await PacienteAdulto.find({
       $or: [
         { nombres: { $regex: q, $options: "i" } },
-        { cedula: { $regex: q, $options: "i" } }
+        { apellidos: { $regex: q, $options: "i" } },
+        { cedula: { $regex: q, $options: "i" } },
+        { telefono: { $regex: q, $options: "i" } }
       ]
-    }).limit(20);
+    }).select('_id');
+    
+    const idsPacientes = pacientesCoincidentes.map(p => p._id);
+    
+    // Buscar valoraciones que pertenezcan a esos pacientes
+    const valoraciones = await Valoracion.find({
+      $or: [
+        { paciente: { $in: idsPacientes } },
+        { motivoConsulta: { $regex: q, $options: "i" } }
+      ]
+    })
+    .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
+    .sort({ createdAt: -1 })
+    .limit(20);
+    
     res.json(valoraciones);
   } catch (e) {
     console.error("Error en /buscar:", e);
-    res.json([]);
+    res.status(500).json({ error: "Error en la búsqueda", mensaje: e.message });
   }
 });
 
 // Obtener una valoración por ID
 router.get('/:id', async (req, res) => {
   try {
-    const valoracion = await Valoracion.findById(req.params.id);
+    console.log('Buscando valoración piso pélvico:', req.params.id);
+    
+    const valoracion = await Valoracion.findById(req.params.id)
+      .populate('paciente', 'nombres cedula genero lugarNacimiento fechaNacimiento edad estadoCivil direccion telefono celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto');
+    
+    if (!valoracion) {
+      return res.status(404).json({ mensaje: 'Valoración no encontrada' });
+    }
+
+    console.log('✓ Valoración encontrada con paciente:', valoracion.paciente ? 'SÍ' : 'NO');
     res.json(valoracion);
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al obtener valoración', error });
+    console.error('Error al obtener valoración piso pélvico:', error);
+    res.status(500).json({ mensaje: 'Error al obtener valoración', error: error.message });
   }
 });
 
@@ -138,7 +214,7 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
       req.params.id, 
       req.body, 
       { runValidators: true, new: true }
-    );
+    ).populate('paciente', 'nombres cedula genero lugarNacimiento fechaNacimiento edad estadoCivil direccion telefono celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto');
 
     console.log(`✓ Valoración piso pélvico actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
     
@@ -160,13 +236,23 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
 // Eliminar una valoración por ID
 router.delete('/:id', async (req, res) => {
   try {
+    const { id } = req.params;
+    console.log(`Intentando eliminar valoración piso pélvico con ID: ${id}`);
+    
+    // Validar que el ID tenga el formato correcto de MongoDB ObjectId
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log('❌ ID inválido - no es un ObjectId válido');
+      return res.status(400).json({ mensaje: "ID de valoración inválido" });
+    }
+    
     // Primero obtener la valoración para acceder a las imágenes
-    const valoracion = await Valoracion.findById(req.params.id);
+    const valoracion = await Valoracion.findById(id);
     if (!valoracion) {
+      console.log('❌ Valoración no encontrada en la base de datos');
       return res.status(404).json({ mensaje: "Valoración no encontrada" });
     }
 
-    console.log(`Eliminando valoración piso pélvico ${req.params.id} y sus imágenes asociadas...`);
+    console.log(`✅ Valoración encontrada, procediendo a eliminar...`);
 
     // Lista de campos que pueden contener imágenes (ajustar según el modelo)
     const camposImagen = [
@@ -180,8 +266,9 @@ router.delete('/:id', async (req, res) => {
     const resultadosEliminacion = await eliminarImagenesValoracion(valoracion, camposImagen);
 
     // Eliminar la valoración de la base de datos
-    await Valoracion.findByIdAndDelete(req.params.id);
+    await Valoracion.findByIdAndDelete(id);
     
+    console.log(`✅ Valoración ${id} eliminada exitosamente`);
     res.json({ 
       mensaje: 'Valoración eliminada exitosamente',
       imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
@@ -189,7 +276,7 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Error al eliminar valoración piso pélvico:', error);
-    res.status(500).json({ mensaje: 'Error al eliminar valoración', error });
+    res.status(500).json({ mensaje: 'Error al eliminar valoración', error: error.message });
   }
 });
 
