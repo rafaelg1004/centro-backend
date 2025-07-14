@@ -6,15 +6,26 @@ const router = express.Router();
 // Registrar paciente adulto
 router.post("/", async (req, res) => {
   try {
+    console.log("📝 Datos recibidos para registro:", req.body);
+    
     const existe = await PacienteAdulto.findOne({ cedula: req.body.cedula });
     if (existe) {
       return res.status(400).json({ error: "El paciente adulto ya existe" });
     }
+    
+    // Validar que el estadoEmbarazo sea válido
+    if (req.body.estadoEmbarazo && !['gestacion', 'posparto'].includes(req.body.estadoEmbarazo)) {
+      return res.status(400).json({ error: "Estado de embarazo inválido" });
+    }
+    
     const paciente = new PacienteAdulto(req.body);
     await paciente.save();
+    
+    console.log("✅ Paciente adulto registrado:", paciente._id);
     res.json({ mensaje: "Paciente adulto registrado correctamente" });
   } catch (error) {
-    res.status(500).json({ error: "Error al registrar paciente adulto" });
+    console.error("❌ Error al registrar paciente adulto:", error);
+    res.status(500).json({ error: "Error al registrar paciente adulto", details: error.message });
   }
 });
 
@@ -60,17 +71,28 @@ router.get("/:id", async (req, res) => {
 // Actualizar paciente adulto por ID
 router.put("/:id", async (req, res) => {
   try {
+    console.log("📝 Datos recibidos para actualización:", req.body);
+    
+    // Validar que el estadoEmbarazo sea válido si está presente
+    if (req.body.estadoEmbarazo && !['gestacion', 'posparto'].includes(req.body.estadoEmbarazo)) {
+      return res.status(400).json({ error: "Estado de embarazo inválido" });
+    }
+    
     const actualizado = await PacienteAdulto.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
+    
     if (!actualizado) {
       return res.status(404).json({ mensaje: "Paciente adulto no encontrado" });
     }
+    
+    console.log("✅ Paciente adulto actualizado:", actualizado._id);
     res.json({ mensaje: "Paciente adulto actualizado correctamente", paciente: actualizado });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error al actualizar paciente adulto", error });
+    console.error("❌ Error al actualizar paciente adulto:", error);
+    res.status(500).json({ mensaje: "Error al actualizar paciente adulto", error: error.message });
   }
 });
 

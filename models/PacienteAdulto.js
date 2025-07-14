@@ -18,6 +18,11 @@ const pacienteAdultoSchema = new mongoose.Schema({
   acompanante: String,
   telefonoAcompanante: String,
   nombreBebe: String,
+  estadoEmbarazo: { 
+    type: String, 
+    enum: ['gestacion', 'posparto'],
+    default: 'gestacion' // Para retrocompatibilidad
+  },
   semanasGestacion: String,
   fum: String,
   fechaProbableParto: String,
