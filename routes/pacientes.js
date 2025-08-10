@@ -20,7 +20,7 @@ router.post("/", async (req, res) => {
 });
 router.get("/", async (req, res) => {
   try {
-    const pacientes = await Paciente.find();
+    const pacientes = await Paciente.find().sort({ nombres: 1 });
     res.json(pacientes);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener pacientes" });
@@ -39,7 +39,7 @@ router.get("/buscar", async (req, res) => {
         { registroCivil: { $regex: q, $options: "i" } },
         { cedula: { $regex: q, $options: "i" } }
       ]
-    }).limit(20);
+    }).sort({ nombres: 1 }).limit(20);
     res.json(pacientes);
   } catch (e) {
     console.error("Error en /buscar:", e);
