@@ -79,7 +79,25 @@ router.post('/', validarImagenes, async (req, res) => {
 // Obtener todas las valoraciones (con filtros opcionales)
 router.get('/', async (req, res) => {
   try {
-    const valoraciones = await ValoracionIngreso.find({ /* tus filtros */ }).populate('paciente');
+    const { busqueda, fechaInicio, fechaFin } = req.query;
+    let query = {};
+
+    // Filtro de búsqueda por nombre o documento
+    if (busqueda) {
+      query.$or = [
+        { 'nombres': { $regex: busqueda, $options: 'i' } },
+        { 'registroCivil': { $regex: busqueda, $options: 'i' } }
+      ];
+    }
+
+    // Filtros de fecha
+    if (fechaInicio || fechaFin) {
+      query.fecha = {};
+      if (fechaInicio) query.fecha.$gte = fechaInicio;
+      if (fechaFin) query.fecha.$lte = fechaFin;
+    }
+
+    const valoraciones = await ValoracionIngreso.find(query).populate('paciente');
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error });

@@ -46,6 +46,42 @@ app.use('/api/consentimiento-perinatal', require('./routes/consentimientoPerinat
 app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
 app.use('/api', require('./routes/upload'));
 
+// Endpoint para eliminar firmas de S3
+const { eliminarImagenDeS3 } = require('./utils/s3Utils');
+app.post('/api/eliminar-firmas-s3', async (req, res) => {
+  try {
+    const { urls } = req.body;
+    
+    if (!urls || !Array.isArray(urls)) {
+      return res.status(400).json({ error: 'Se requiere un array de URLs' });
+    }
+    
+    console.log(`Eliminando ${urls.length} firmas de S3...`);
+    const resultados = [];
+    
+    for (const url of urls) {
+      const resultado = await eliminarImagenDeS3(url);
+      resultados.push({ url, ...resultado });
+    }
+    
+    const exitosos = resultados.filter(r => r.success).length;
+    const fallidos = resultados.filter(r => !r.success).length;
+    
+    console.log(`✓ Eliminación completada: ${exitosos} exitosos, ${fallidos} fallidos`);
+    
+    res.json({
+      mensaje: `Eliminación completada: ${exitosos} exitosos, ${fallidos} fallidos`,
+      resultados,
+      exitosos,
+      fallidos
+    });
+    
+  } catch (error) {
+    console.error('Error eliminando firmas de S3:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DEBUGGING: Endpoint temporal para interceptar datos del frontend
 app.post('/api/debug-consentimiento-perinatal', async (req, res) => {
   console.log('\n=== DEBUG: DATOS RECIBIDOS DEL FRONTEND ===');

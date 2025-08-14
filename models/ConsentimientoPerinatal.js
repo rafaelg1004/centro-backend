@@ -15,6 +15,7 @@ const ConsentimientoPerinatalSchema = new mongoose.Schema({
   fecha: String,
   hora: String,
   motivoConsulta: String,
+  tipoPrograma: { type: String, enum: ['educacion', 'fisico', 'intensivo', 'ambos'] }, // Tipo de programa seleccionado
 
   // Paso 2: Antecedentes
   hospitalarios: String,
@@ -126,13 +127,19 @@ const ConsentimientoPerinatalSchema = new mongoose.Schema({
 
   // Paso 7: Consentimiento educación perinatal (10 sesiones)
   sesiones: { type: [SesionPerinatalSchema], default: [] }, // Array de sesiones (puede estar vacío)
-  firmaPacienteGeneral: { type: String, required: true }, // Firma general paciente
-  firmaFisioterapeutaGeneral: { type: String, required: true }, // Firma general fisioterapeuta
+  firmaPacienteGeneral: String, // Firma general paciente
+  firmaFisioterapeutaGeneral: String, // Firma general fisioterapeuta
 
   // Paso 8: Consentimiento intensivo (si aplica)
   sesionesIntensivo: [SesionPerinatalSchema], // 3 sesiones intensivo (opcional)
   firmaPacienteGeneralIntensivo: String,
   firmaFisioterapeutaGeneralIntensivo: String,
+  
+  // Firmas adicionales para diferentes tipos de programa
+  firmaPacienteFisico: String, // Firma para programa físico
+  firmaFisioterapeutaFisico: String, // Firma fisioterapeuta para programa físico
+  firmaPacienteEducacion: String, // Firma para programa intensivo/educación
+  firmaFisioterapeutaEducacion: String, // Firma fisioterapeuta para programa intensivo/educación
 
   fechaRegistro: { type: Date, default: Date.now },
 });
