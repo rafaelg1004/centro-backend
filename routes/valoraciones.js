@@ -86,7 +86,9 @@ router.get('/', async (req, res) => {
     if (busqueda) {
       query.$or = [
         { 'nombres': { $regex: busqueda, $options: 'i' } },
-        { 'registroCivil': { $regex: busqueda, $options: 'i' } }
+        { 'registroCivil': { $regex: busqueda, $options: 'i' } },
+        { 'paciente.nombres': { $regex: busqueda, $options: 'i' } },
+        { 'paciente.registroCivil': { $regex: busqueda, $options: 'i' } }
       ];
     }
 
