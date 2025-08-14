@@ -106,6 +106,78 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Obtener valoraciones por paciente (solo para niños - ValoracionIngreso)
+router.get('/paciente/:pacienteId', async (req, res) => {
+  try {
+    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente').sort({ createdAt: -1 });
+    res.json(valoraciones);
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al obtener valoraciones del paciente', error });
+  }
+});
+
+// Obtener todas las valoraciones de un paciente adulto (todos los tipos)
+router.get('/adulto/:pacienteId', async (req, res) => {
+  try {
+    console.log('=== BUSCANDO VALORACIONES ADULTO ===');
+    console.log('Paciente ID:', req.params.pacienteId);
+    
+    const ValoracionLactancia = require('../models/ValoracionIngresoAdultosLactancia');
+    const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
+    const ConsentimientoPerinatal = require('../models/ConsentimientoPerinatal');
+    
+    // Buscar lactancia
+    console.log('Buscando valoraciones de lactancia...');
+    const lactancia = await ValoracionLactancia.find({ paciente: req.params.pacienteId }).populate('paciente');
+    console.log('Lactancia encontradas:', lactancia.length);
+    
+    // Buscar piso pélvico
+    console.log('Buscando valoraciones de piso pélvico...');
+    const pisoPelvico = await ValoracionPisoPelvico.find({ paciente: req.params.pacienteId }).populate('paciente');
+    console.log('Piso pélvico encontradas:', pisoPelvico.length);
+    
+    // Buscar perinatal
+    console.log('Buscando consentimientos perinatales...');
+    const perinatal = await ConsentimientoPerinatal.find({ paciente: req.params.pacienteId }).populate('paciente');
+    console.log('Perinatales encontrados:', perinatal.length);
+    
+    // Combinar y agregar tipo
+    const todasLasValoraciones = [];
+    
+    lactancia.forEach(v => {
+      todasLasValoraciones.push({
+        ...v.toObject(),
+        tipo: 'Lactancia',
+        ruta: `/valoracion-adultos-lactancia/${v._id}`
+      });
+    });
+    
+    pisoPelvico.forEach(v => {
+      todasLasValoraciones.push({
+        ...v.toObject(),
+        tipo: 'Piso Pélvico',
+        ruta: `/valoracion-piso-pelvico/${v._id}`
+      });
+    });
+    
+    perinatal.forEach(v => {
+      todasLasValoraciones.push({
+        ...v.toObject(),
+        tipo: 'Perinatal',
+        ruta: `/consentimientos-perinatales/${v._id}`
+      });
+    });
+    
+    console.log('Total valoraciones combinadas:', todasLasValoraciones.length);
+    console.log('Valoraciones:', todasLasValoraciones.map(v => ({ id: v._id, tipo: v.tipo, fecha: v.fecha || v.createdAt })));
+    
+    res.json(todasLasValoraciones);
+  } catch (error) {
+    console.error('Error al obtener valoraciones del paciente adulto:', error);
+    res.status(500).json({ mensaje: 'Error al obtener valoraciones del paciente adulto', error: error.message });
+  }
+});
+
 // Obtener una valoración por ID
 router.get('/:id', async (req, res) => {
   try {

@@ -146,9 +146,13 @@ router.get("/:id", async (req, res) => {
 // Obtener consentimiento por paciente adulto
 router.get("/paciente/:pacienteId", async (req, res) => {
   try {
+    console.log('Buscando consentimientos para paciente ID:', req.params.pacienteId);
     const consentimiento = await ConsentimientoPerinatal.find({ paciente: req.params.pacienteId }).populate("paciente");
+    console.log('Consentimientos encontrados:', consentimiento.length);
+    console.log('IDs de pacientes en consentimientos:', consentimiento.map(c => c.paciente?._id || c.paciente));
     res.json(consentimiento);
   } catch (error) {
+    console.error('Error al buscar consentimientos por paciente:', error);
     res.status(500).json({ error: error.message });
   }
 });
