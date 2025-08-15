@@ -63,6 +63,23 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
       });
     }
 
+    // Verificar si ya existe una valoración para este paciente
+    const valoracionExistente = await Valoracion.findOne({ paciente: req.body.paciente });
+    
+    if (valoracionExistente) {
+      console.log('⚠️ Ya existe una valoración de piso pélvico para este paciente:', valoracionExistente._id);
+      return res.status(409).json({
+        error: 'VALORACION_DUPLICADA',
+        mensaje: 'Este paciente ya tiene una valoración de piso pélvico. Puede editarla si lo desea.',
+        valoracionExistente: {
+          id: valoracionExistente._id,
+          fecha: valoracionExistente.fecha,
+          motivoConsulta: valoracionExistente.motivoConsulta
+        },
+        sugerencia: 'Use la opción de editar para modificar la valoración existente'
+      });
+    }
+    
     const nuevaValoracion = new Valoracion(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
     
@@ -74,12 +91,16 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
   }
 });
 
-// Obtener todas las valoraciones (con filtros opcionales)
+// Obtener todas las valoraciones (con filtros opcionales y paginación)
 router.get('/', async (req, res) => {
   try {
     console.log('Obteniendo valoraciones piso pélvico con filtros...');
     
-    const { busqueda, fechaInicio, fechaFin } = req.query;
+    const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 15 } = req.query;
+    const paginaNum = parseInt(pagina);
+    const limiteNum = parseInt(limite);
+    const skip = (paginaNum - 1) * limiteNum;
+    
     let query = {};
 
     // Filtros de fecha
@@ -89,29 +110,87 @@ router.get('/', async (req, res) => {
       if (fechaFin) query.fecha.$lte = fechaFin;
     }
 
+    // Si hay búsqueda, buscar en pacientes adultos primero
+    let busquedaRegex = '';
+    if (busqueda) {
+      const PacienteAdulto = require('../models/PacienteAdulto');
+      
+      // Crear regex que ignore acentos y caracteres especiales
+      busquedaRegex = busqueda.replace(/[áäâà]/gi, '[áäâà]')
+                              .replace(/[éëêè]/gi, '[éëêè]')
+                              .replace(/[íïîì]/gi, '[íïîì]')
+                              .replace(/[óöôò]/gi, '[óöôò]')
+                              .replace(/[úüûù]/gi, '[úüûù]')
+                              .replace(/[ñ]/gi, '[ñ]');
+      
+      const pacientesCoincidentes = await PacienteAdulto.find({
+        $or: [
+          { nombres: { $regex: busquedaRegex, $options: "i" } },
+          { apellidos: { $regex: busquedaRegex, $options: "i" } },
+          { cedula: { $regex: busquedaRegex, $options: "i" } }
+        ]
+      }).select('_id');
+      
+      const idsPacientes = pacientesCoincidentes.map(p => p._id);
+      query.paciente = { $in: idsPacientes };
+    }
+
+    // Obtener total de documentos para paginación
+    const total = await Valoracion.countDocuments(query);
+    
+    // Obtener valoraciones con paginación
     const valoraciones = await Valoracion.find(query)
       .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
-      .sort({ createdAt: -1 })
-      .limit(50);
+      .sort({ 
+        'paciente.nombres': 1,
+        'paciente.apellidos': 1,
+        createdAt: -1 
+      })
+      .skip(skip)
+      .limit(limiteNum);
     
-    // Filtro de búsqueda por nombre o cédula (aplicado después del populate)
-    let valoracionesFiltradas = valoraciones;
-    if (busqueda) {
-      valoracionesFiltradas = valoraciones.filter(v => {
-        const paciente = v.paciente;
-        if (!paciente) return false;
-        const nombres = paciente.nombres || '';
-        const cedula = paciente.cedula || '';
-        return nombres.toLowerCase().includes(busqueda.toLowerCase()) ||
-               cedula.toLowerCase().includes(busqueda.toLowerCase());
-      });
-    }
-    
-    console.log(`✓ Encontradas ${valoracionesFiltradas.length} valoraciones piso pélvico`);
-    res.json(valoracionesFiltradas);
+    console.log(`✓ Encontradas ${valoraciones.length} valoraciones piso pélvico de ${total} totales`);
+    res.json({
+      valoraciones,
+      paginacion: {
+        pagina: paginaNum,
+        limite: limiteNum,
+        total,
+        totalPaginas: Math.ceil(total / limiteNum),
+        tieneSiguiente: paginaNum < Math.ceil(total / limiteNum),
+        tieneAnterior: paginaNum > 1
+      }
+    });
   } catch (error) {
     console.error('Error al obtener valoraciones piso pélvico:', error);
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error: error.message });
+  }
+});
+
+// Verificar si un paciente ya tiene valoración de piso pélvico
+router.get('/verificar/:pacienteId', async (req, res) => {
+  try {
+    const valoracion = await Valoracion.findOne({ paciente: req.params.pacienteId });
+    
+    if (valoracion) {
+      res.json({
+        tieneValoracion: true,
+        valoracion: {
+          id: valoracion._id,
+          fecha: valoracion.fecha,
+          motivoConsulta: valoracion.motivoConsulta,
+          createdAt: valoracion.createdAt
+        },
+        mensaje: 'Este paciente ya tiene una valoración de piso pélvico. Puede editarla si lo desea.'
+      });
+    } else {
+      res.json({
+        tieneValoracion: false,
+        mensaje: 'Este paciente no tiene valoración de piso pélvico. Puede crear una nueva.'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al verificar valoración del paciente', error });
   }
 });
 

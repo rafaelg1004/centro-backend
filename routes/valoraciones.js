@@ -33,6 +33,12 @@ const validarImagenes = (req, res, next) => {
 router.post('/', validarImagenes, async (req, res) => {
   try {
     console.log('=== DEPURACIÓN DE DATOS RECIBIDOS ===');
+    console.log('🔍 Datos completos recibidos:', {
+      paciente: req.body.paciente,
+      tipoPaciente: typeof req.body.paciente,
+      fecha: req.body.fecha,
+      motivoDeConsulta: req.body.motivoDeConsulta
+    });
     console.log('rutinaDiaria recibido:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
     
     // Asegurar que todos los campos de texto sean strings
@@ -67,6 +73,66 @@ router.post('/', validarImagenes, async (req, res) => {
     
     console.log('rutinaDiaria después de limpieza:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
     
+    // Verificar si ya existe una valoración para este paciente
+    if (req.body.paciente) {
+      console.log('🔍 Verificando si ya existe valoración para paciente:', req.body.paciente);
+      
+      // Validar que el ID del paciente sea válido
+      if (!req.body.paciente.match(/^[0-9a-fA-F]{24}$/)) {
+        console.log('❌ ID de paciente inválido:', req.body.paciente);
+        return res.status(400).json({
+          error: 'PACIENTE_ID_INVALIDO',
+          mensaje: 'El ID del paciente no es válido'
+        });
+      }
+      
+      // Verificar que el paciente existe en la base de datos
+      const Paciente = require('../models/Paciente');
+      const pacienteExiste = await Paciente.findById(req.body.paciente);
+      if (!pacienteExiste) {
+        console.log('❌ Paciente no encontrado en la base de datos:', req.body.paciente);
+        return res.status(404).json({
+          error: 'PACIENTE_NO_ENCONTRADO',
+          mensaje: 'El paciente no existe en la base de datos'
+        });
+      }
+      
+      console.log('✅ Paciente encontrado:', pacienteExiste.nombres);
+      
+      // Buscar valoración existente
+      const valoracionExistente = await ValoracionIngreso.findOne({ paciente: req.body.paciente });
+      console.log('🔍 Resultado de búsqueda de valoración:', valoracionExistente ? `Encontrada: ${valoracionExistente._id}` : 'No encontrada');
+      
+      if (valoracionExistente) {
+        console.log('⚠️ Ya existe una valoración para este paciente:', valoracionExistente._id);
+        console.log('⚠️ Detalles de la valoración existente:', {
+          id: valoracionExistente._id,
+          fecha: valoracionExistente.fecha,
+          motivoDeConsulta: valoracionExistente.motivoDeConsulta,
+          paciente: valoracionExistente.paciente
+        });
+        
+        return res.status(409).json({
+          error: 'VALORACION_DUPLICADA',
+          mensaje: 'Este paciente ya tiene una valoración de ingreso. Puede editarla si lo desea.',
+          valoracionExistente: {
+            id: valoracionExistente._id,
+            fecha: valoracionExistente.fecha,
+            motivoDeConsulta: valoracionExistente.motivoDeConsulta
+          },
+          sugerencia: 'Use la opción de editar para modificar la valoración existente'
+        });
+      } else {
+        console.log('✅ No se encontró valoración existente, procediendo a crear nueva');
+      }
+    } else {
+      console.log('⚠️ No se proporcionó ID de paciente en la solicitud');
+      return res.status(400).json({
+        error: 'PACIENTE_REQUERIDO',
+        mensaje: 'El campo paciente es obligatorio'
+      });
+    }
+    
     const nuevaValoracion = new ValoracionIngreso(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
     res.status(201).json(valoracionGuardada);
@@ -76,20 +142,48 @@ router.post('/', validarImagenes, async (req, res) => {
   }
 });
 
-// Obtener todas las valoraciones (con filtros opcionales)
+// Obtener todas las valoraciones (con filtros opcionales y paginación)
 router.get('/', async (req, res) => {
   try {
-    const { busqueda, fechaInicio, fechaFin } = req.query;
+    const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 15 } = req.query;
+    const paginaNum = parseInt(pagina);
+    const limiteNum = parseInt(limite);
+    const skip = (paginaNum - 1) * limiteNum;
+    
     let query = {};
 
+    console.log('🔍 Búsqueda de valoraciones con parámetros:', { busqueda, fechaInicio, fechaFin, pagina: paginaNum, limite: limiteNum });
+
     // Filtro de búsqueda por nombre o documento
+    let busquedaRegex = '';
     if (busqueda) {
-      query.$or = [
-        { 'nombres': { $regex: busqueda, $options: 'i' } },
-        { 'registroCivil': { $regex: busqueda, $options: 'i' } },
-        { 'paciente.nombres': { $regex: busqueda, $options: 'i' } },
-        { 'paciente.registroCivil': { $regex: busqueda, $options: 'i' } }
-      ];
+      // Crear regex que ignore acentos y caracteres especiales
+      busquedaRegex = busqueda.replace(/[áäâà]/gi, '[áäâà]')
+                              .replace(/[éëêè]/gi, '[éëêè]')
+                              .replace(/[íïîì]/gi, '[íïîì]')
+                              .replace(/[óöôò]/gi, '[óöôò]')
+                              .replace(/[úüûù]/gi, '[úüûù]')
+                              .replace(/[ñ]/gi, '[ñ]');
+      
+      // Primero buscar pacientes que coincidan
+      const Paciente = require('../models/Paciente');
+      const pacientesCoincidentes = await Paciente.find({
+        $or: [
+          { nombres: { $regex: busquedaRegex, $options: 'i' } },
+          { apellidos: { $regex: busquedaRegex, $options: 'i' } },
+          { registroCivil: { $regex: busquedaRegex, $options: 'i' } }
+        ]
+      }).select('_id');
+      
+      const idsPacientes = pacientesCoincidentes.map(p => p._id);
+      console.log('🔍 Pacientes encontrados:', idsPacientes.length);
+      console.log('🔍 IDs de pacientes:', idsPacientes);
+      
+      // Buscar valoraciones que pertenezcan a esos pacientes
+      query.paciente = { $in: idsPacientes };
+      
+      console.log('🔍 Query de búsqueda:', JSON.stringify(query, null, 2));
+      console.log('🔍 Regex generado:', busquedaRegex);
     }
 
     // Filtros de fecha
@@ -99,10 +193,88 @@ router.get('/', async (req, res) => {
       if (fechaFin) query.fecha.$lte = fechaFin;
     }
 
-    const valoraciones = await ValoracionIngreso.find(query).populate('paciente');
-    res.json(valoraciones);
+    console.log('🔍 Query final:', JSON.stringify(query, null, 2));
+
+    // Obtener total de documentos para paginación
+    const total = await ValoracionIngreso.countDocuments(query);
+    
+    // Obtener valoraciones con paginación
+    const valoraciones = await ValoracionIngreso.find(query)
+      .populate('paciente', 'nombres apellidos registroCivil')
+      .sort({ 
+        'paciente.nombres': 1,
+        'paciente.apellidos': 1,
+        createdAt: -1 
+      })
+      .skip(skip)
+      .limit(limiteNum);
+    
+          console.log(`📋 Encontradas ${valoraciones.length} valoraciones de ${total} totales`);
+      console.log('📋 Primeras valoraciones:', valoraciones.slice(0, 3).map(v => ({
+        id: v._id,
+        paciente: v.paciente ? {
+          nombres: v.paciente.nombres,
+          registroCivil: v.paciente.registroCivil
+        } : 'NO POBLADO',
+        nombres: v.nombres,
+        registroCivil: v.registroCivil
+      })));
+      
+      // Debug adicional para búsquedas
+      if (busqueda) {
+        console.log('🔍 Búsqueda realizada:', busqueda);
+        console.log('🔍 Regex usado:', busquedaRegex);
+        console.log('🔍 Query completo:', JSON.stringify(query, null, 2));
+        console.log('🔍 Valoraciones que coinciden con la búsqueda:');
+        valoraciones.forEach((v, idx) => {
+          const nombrePaciente = v.paciente?.nombres || 'Sin nombre';
+          const apellidoPaciente = v.paciente?.apellidos || '';
+          const docPaciente = v.paciente?.registroCivil || 'Sin documento';
+          console.log(`  ${idx + 1}. Nombre: "${nombrePaciente} ${apellidoPaciente}".trim() | Doc: "${docPaciente}" | ID Paciente: ${v.paciente?._id || 'NO POBLADO'}`);
+        });
+      }
+    
+    res.json({
+      valoraciones,
+      paginacion: {
+        pagina: paginaNum,
+        limite: limiteNum,
+        total,
+        totalPaginas: Math.ceil(total / limiteNum),
+        tieneSiguiente: paginaNum < Math.ceil(total / limiteNum),
+        tieneAnterior: paginaNum > 1
+      }
+    });
   } catch (error) {
+    console.error('❌ Error en búsqueda de valoraciones:', error);
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error });
+  }
+});
+
+// Verificar si un paciente ya tiene valoración de ingreso
+router.get('/verificar/:pacienteId', async (req, res) => {
+  try {
+    const valoracion = await ValoracionIngreso.findOne({ paciente: req.params.pacienteId });
+    
+    if (valoracion) {
+      res.json({
+        tieneValoracion: true,
+        valoracion: {
+          id: valoracion._id,
+          fecha: valoracion.fecha,
+          motivoDeConsulta: valoracion.motivoDeConsulta,
+          createdAt: valoracion.createdAt
+        },
+        mensaje: 'Este paciente ya tiene una valoración de ingreso. Puede editarla si lo desea.'
+      });
+    } else {
+      res.json({
+        tieneValoracion: false,
+        mensaje: 'Este paciente no tiene valoración de ingreso. Puede crear una nueva.'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al verificar valoración del paciente', error });
   }
 });
 
