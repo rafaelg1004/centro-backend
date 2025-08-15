@@ -46,10 +46,28 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
   }
 });
 
-// Obtener todas las valoraciones
+// Obtener todas las valoraciones (con filtros opcionales)
 router.get('/', async (req, res) => {
   try {
-    const valoraciones = await Valoracion.find();
+    const { busqueda, fechaInicio, fechaFin } = req.query;
+    let query = {};
+
+    // Filtro de búsqueda por nombre o cédula
+    if (busqueda) {
+      query.$or = [
+        { 'nombres': { $regex: busqueda, $options: 'i' } },
+        { 'cedula': { $regex: busqueda, $options: 'i' } }
+      ];
+    }
+
+    // Filtros de fecha
+    if (fechaInicio || fechaFin) {
+      query.fecha = {};
+      if (fechaInicio) query.fecha.$gte = fechaInicio;
+      if (fechaFin) query.fecha.$lte = fechaFin;
+    }
+
+    const valoraciones = await Valoracion.find(query);
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error });

@@ -60,10 +60,20 @@ router.post("/:id/firma-nino", async (req, res) => {
   }
 });
 
-// Obtener todas las clases
+// Obtener todas las clases (con filtros opcionales)
 router.get("/", async (req, res) => {
   try {
-    const clases = await Clase.find().populate("ninos.nino");
+    const { fechaInicio, fechaFin } = req.query;
+    let query = {};
+
+    // Filtros de fecha
+    if (fechaInicio || fechaFin) {
+      query.fecha = {};
+      if (fechaInicio) query.fecha.$gte = fechaInicio;
+      if (fechaFin) query.fecha.$lte = fechaFin;
+    }
+
+    const clases = await Clase.find(query).populate("ninos.nino");
     res.json(clases);
   } catch (e) {
     res.status(500).json({ error: e.message });

@@ -74,18 +74,41 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
   }
 });
 
-// Obtener todas las valoraciones
+// Obtener todas las valoraciones (con filtros opcionales)
 router.get('/', async (req, res) => {
   try {
-    console.log('Obteniendo todas las valoraciones piso pélvico...');
+    console.log('Obteniendo valoraciones piso pélvico con filtros...');
     
-    const valoraciones = await Valoracion.find()
+    const { busqueda, fechaInicio, fechaFin } = req.query;
+    let query = {};
+
+    // Filtros de fecha
+    if (fechaInicio || fechaFin) {
+      query.fecha = {};
+      if (fechaInicio) query.fecha.$gte = fechaInicio;
+      if (fechaFin) query.fecha.$lte = fechaFin;
+    }
+
+    const valoraciones = await Valoracion.find(query)
       .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
       .sort({ createdAt: -1 })
       .limit(50);
     
-    console.log(`✓ Encontradas ${valoraciones.length} valoraciones piso pélvico`);
-    res.json(valoraciones);
+    // Filtro de búsqueda por nombre o cédula (aplicado después del populate)
+    let valoracionesFiltradas = valoraciones;
+    if (busqueda) {
+      valoracionesFiltradas = valoraciones.filter(v => {
+        const paciente = v.paciente;
+        if (!paciente) return false;
+        const nombres = paciente.nombres || '';
+        const cedula = paciente.cedula || '';
+        return nombres.toLowerCase().includes(busqueda.toLowerCase()) ||
+               cedula.toLowerCase().includes(busqueda.toLowerCase());
+      });
+    }
+    
+    console.log(`✓ Encontradas ${valoracionesFiltradas.length} valoraciones piso pélvico`);
+    res.json(valoracionesFiltradas);
   } catch (error) {
     console.error('Error al obtener valoraciones piso pélvico:', error);
     res.status(500).json({ mensaje: 'Error al obtener valoraciones', error: error.message });

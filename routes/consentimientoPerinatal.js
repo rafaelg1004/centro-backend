@@ -90,11 +90,35 @@ router.post("/", bloquearImagenesBase64, async (req, res) => {
   }
 });
 
-// Obtener todos los consentimientos perinatales
+// Obtener todos los consentimientos perinatales (con filtros opcionales)
 router.get("/", async (req, res) => {
   try {
-    const consentimientos = await ConsentimientoPerinatal.find().populate("paciente");
-    res.json(consentimientos);
+    const { busqueda, fechaInicio, fechaFin } = req.query;
+    let query = {};
+
+    // Filtros de fecha
+    if (fechaInicio || fechaFin) {
+      query.fecha = {};
+      if (fechaInicio) query.fecha.$gte = fechaInicio;
+      if (fechaFin) query.fecha.$lte = fechaFin;
+    }
+
+    const consentimientos = await ConsentimientoPerinatal.find(query).populate("paciente");
+    
+    // Filtro de búsqueda por nombre o cédula (aplicado después del populate)
+    let consentimientosFiltrados = consentimientos;
+    if (busqueda) {
+      consentimientosFiltrados = consentimientos.filter(c => {
+        const paciente = c.paciente;
+        if (!paciente) return false;
+        const nombres = paciente.nombres || '';
+        const cedula = paciente.cedula || '';
+        return nombres.toLowerCase().includes(busqueda.toLowerCase()) ||
+               cedula.toLowerCase().includes(busqueda.toLowerCase());
+      });
+    }
+    
+    res.json(consentimientosFiltrados);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
