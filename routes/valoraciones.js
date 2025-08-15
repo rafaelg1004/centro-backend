@@ -195,26 +195,48 @@ router.get('/', async (req, res) => {
 
     console.log('🔍 Query final:', JSON.stringify(query, null, 2));
 
-    // Obtener total de documentos para paginación
-    const total = await ValoracionIngreso.countDocuments(query);
+    // Obtener TODAS las valoraciones para ordenamiento global
+    let todasLasValoraciones = await ValoracionIngreso.find(query)
+      .populate('paciente', 'nombres apellidos registroCivil nombreMadre');
     
-    // Obtener valoraciones con paginación
-    const valoraciones = await ValoracionIngreso.find(query)
-      .populate('paciente', 'nombres apellidos registroCivil')
-      .sort({ 
-        'paciente.nombres': 1,
-        'paciente.apellidos': 1,
-        createdAt: -1 
-      })
-      .skip(skip)
-      .limit(limiteNum);
+    // Ordenar alfabéticamente TODAS las valoraciones (ordenamiento global)
+    todasLasValoraciones.sort((a, b) => {
+      const nombreA = (a.paciente?.nombres || '').toLowerCase();
+      const nombreB = (b.paciente?.nombres || '').toLowerCase();
+      const apellidoA = (a.paciente?.apellidos || '').toLowerCase();
+      const apellidoB = (b.paciente?.apellidos || '').toLowerCase();
+      
+      // Primero comparar nombres
+      if (nombreA !== nombreB) {
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+      }
+      
+      // Si los nombres son iguales, comparar apellidos
+      return apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+    });
+    
+    // Obtener total de documentos para paginación
+    const total = todasLasValoraciones.length;
+    
+    // Aplicar paginación DESPUÉS del ordenamiento global
+    const valoraciones = todasLasValoraciones.slice(skip, skip + limiteNum);
+    
+    console.log('📋 Ordenamiento alfabético GLOBAL aplicado. Primeras valoraciones ordenadas:');
+    valoraciones.slice(0, 5).forEach((v, idx) => {
+      console.log(`  ${idx + 1}. ${v.paciente?.nombres || 'Sin nombre'} ${v.paciente?.apellidos || ''}`);
+    });
+    
+    console.log(`📋 Total de valoraciones ordenadas: ${total}`);
+    console.log(`📋 Página ${paginaNum}: mostrando del índice ${skip} al ${skip + valoraciones.length - 1}`);
     
           console.log(`📋 Encontradas ${valoraciones.length} valoraciones de ${total} totales`);
       console.log('📋 Primeras valoraciones:', valoraciones.slice(0, 3).map(v => ({
         id: v._id,
         paciente: v.paciente ? {
           nombres: v.paciente.nombres,
-          registroCivil: v.paciente.registroCivil
+          apellidos: v.paciente.apellidos,
+          registroCivil: v.paciente.registroCivil,
+          nombreMadre: v.paciente.nombreMadre
         } : 'NO POBLADO',
         nombres: v.nombres,
         registroCivil: v.registroCivil
@@ -281,7 +303,7 @@ router.get('/verificar/:pacienteId', async (req, res) => {
 // Obtener valoraciones por paciente (solo para niños - ValoracionIngreso)
 router.get('/paciente/:pacienteId', async (req, res) => {
   try {
-    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente').sort({ createdAt: -1 });
+    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente', 'nombres apellidos registroCivil nombreMadre').sort({ createdAt: -1 });
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones del paciente', error });
@@ -353,7 +375,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
 // Obtener una valoración por ID
 router.get('/:id', async (req, res) => {
   try {
-    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente');
+    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente', 'nombres apellidos registroCivil nombreMadre');
     res.json(valoracion);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoración', error });
