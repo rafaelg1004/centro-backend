@@ -342,7 +342,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
       todasLasValoraciones.push({
         ...v.toObject(),
         tipo: 'Lactancia',
-        ruta: `/valoracion-adultos-lactancia/${v._id}`
+        ruta: `/valoracion-ingreso-adultos-lactancia/${v._id}`
       });
     });
     
@@ -350,7 +350,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
       todasLasValoraciones.push({
         ...v.toObject(),
         tipo: 'Piso Pélvico',
-        ruta: `/valoracion-piso-pelvico/${v._id}`
+        ruta: `/valoraciones-piso-pelvico/${v._id}`
       });
     });
     
