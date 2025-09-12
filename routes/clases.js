@@ -22,21 +22,61 @@ router.post("/:id/agregar-nino", async (req, res) => {
 
     // Evita duplicados
     if (!clase.ninos.some(n => n.nino.toString() === ninoId)) {
-      // Descontar clase usada en el paquete/factura
-      const paquete = await PagoPaquete.findOne({ numeroFactura });
-      if (!paquete) return res.status(404).json({ error: "Factura no encontrada" });
+      // Si hay numeroFactura, validar y descontar clase
+      if (numeroFactura) {
+        const paquete = await PagoPaquete.findOne({ numeroFactura });
+        if (!paquete) return res.status(404).json({ error: "Factura no encontrada" });
 
-      if (paquete.clasesUsadas >= paquete.clasesPagadas) {
-        return res.status(400).json({ error: "No quedan clases disponibles en este paquete" });
+        if (paquete.clasesUsadas >= paquete.clasesPagadas) {
+          return res.status(400).json({ error: "No quedan clases disponibles en este paquete" });
+        }
+
+        paquete.clasesUsadas += 1;
+        await paquete.save();
+
+        // Agregar el niño con el número de factura
+        clase.ninos.push({ nino: ninoId, numeroFactura });
+      } else {
+        // Agregar el niño sin paquete (se mostrará en rojo)
+        clase.ninos.push({ nino: ninoId, numeroFactura: null });
       }
-
-      paquete.clasesUsadas += 1;
-      await paquete.save();
-
-      // Agregar el niño con el número de factura
-      clase.ninos.push({ nino: ninoId, numeroFactura });
       await clase.save();
     }
+    res.json(clase);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Asignar paquete a un niño ya agregado a la clase
+router.post("/:id/asignar-paquete", async (req, res) => {
+  try {
+    const { ninoId, numeroFactura } = req.body;
+    const clase = await Clase.findById(req.params.id);
+
+    // Buscar el niño en la clase
+    const ninoClase = clase.ninos.find(n => n.nino.toString() === ninoId);
+    if (!ninoClase) return res.status(404).json({ error: "Niño no encontrado en la clase" });
+
+    // Verificar que no tenga ya un paquete asignado
+    if (ninoClase.numeroFactura) {
+      return res.status(400).json({ error: "Este niño ya tiene un paquete asignado" });
+    }
+
+    // Validar el paquete
+    const paquete = await PagoPaquete.findOne({ numeroFactura });
+    if (!paquete) return res.status(404).json({ error: "Factura no encontrada" });
+
+    if (paquete.clasesUsadas >= paquete.clasesPagadas) {
+      return res.status(400).json({ error: "No quedan clases disponibles en este paquete" });
+    }
+
+    // Asignar el paquete y descontar una clase
+    ninoClase.numeroFactura = numeroFactura;
+    paquete.clasesUsadas += 1;
+    await paquete.save();
+    await clase.save();
+
     res.json(clase);
   } catch (e) {
     res.status(500).json({ error: e.message });
