@@ -1,0 +1,1 @@
+{"timestamp":"2025-11-11T15:52:54.038Z","tipo":"EJEMPLO_LOG","usuario":"admin","ip":"192.168.1.100","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36","mensaje":"Este es un ejemplo de log de seguridad","rol":"administracion","endpoint":"/api/auth/login","metodo":"POST"}
