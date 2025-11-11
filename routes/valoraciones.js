@@ -197,7 +197,7 @@ router.get('/', async (req, res) => {
 
     // Obtener TODAS las valoraciones para ordenamiento global
     let todasLasValoraciones = await ValoracionIngreso.find(query)
-      .populate('paciente', 'nombres apellidos registroCivil nombreMadre');
+      .populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante');
     
     // Ordenar alfabéticamente TODAS las valoraciones (ordenamiento global)
     todasLasValoraciones.sort((a, b) => {
@@ -303,7 +303,7 @@ router.get('/verificar/:pacienteId', async (req, res) => {
 // Obtener valoraciones por paciente (solo para niños - ValoracionIngreso)
 router.get('/paciente/:pacienteId', async (req, res) => {
   try {
-    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente', 'nombres apellidos registroCivil nombreMadre').sort({ createdAt: -1 });
+    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante').sort({ createdAt: -1 });
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones del paciente', error });
@@ -375,7 +375,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
 // Obtener una valoración por ID
 router.get('/:id', async (req, res) => {
   try {
-    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente', 'nombres apellidos registroCivil nombreMadre');
+    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante');
     res.json(valoracion);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoración', error });

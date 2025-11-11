@@ -140,11 +140,11 @@ router.get('/', async (req, res) => {
     
     // Obtener valoraciones con paginación
     const valoraciones = await Valoracion.find(query)
-      .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
-      .sort({ 
+      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .sort({
         'paciente.nombres': 1,
         'paciente.apellidos': 1,
-        createdAt: -1 
+        createdAt: -1
       })
       .skip(skip)
       .limit(limiteNum);
@@ -201,7 +201,7 @@ router.get('/buscar', async (req, res) => {
     if (!q || q.trim() === "") {
       // Si no hay búsqueda, devolver todas las valoraciones con datos del paciente
       const valoraciones = await Valoracion.find()
-        .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
+        .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
         .sort({ createdAt: -1 })
         .limit(50);
       return res.json(valoraciones);
@@ -227,7 +227,7 @@ router.get('/buscar', async (req, res) => {
         { motivoConsulta: { $regex: q, $options: "i" } }
       ]
     })
-    .populate('paciente', 'nombres cedula telefono fechaNacimiento edad')
+    .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
     .sort({ createdAt: -1 })
     .limit(20);
     

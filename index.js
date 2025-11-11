@@ -11,6 +11,10 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
+// Importa los modelos ANTES de conectar a la base de datos
+const Paciente = require('./models/Paciente');
+const PacienteAdulto = require('./models/PacienteAdulto');
+
 // Conexión a MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -26,9 +30,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
 .catch(err => console.error('❌ Error al conectar a MongoDB Atlas:', err));
 console.log('MONGODB_URI:', process.env.MONGODB_URI);
-
-// Importa el modelo Paciente
-const Paciente = require('./models/Paciente');
 
 // Rutas
 app.use("/api", require("./routes/exportarWord"));
