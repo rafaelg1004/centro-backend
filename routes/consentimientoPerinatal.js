@@ -103,7 +103,7 @@ router.get("/", async (req, res) => {
       if (fechaFin) query.fecha.$lte = fechaFin;
     }
 
-    const consentimientos = await ConsentimientoPerinatal.find(query).populate("paciente");
+    const consentimientos = await ConsentimientoPerinatal.find(query).populate("paciente", "nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto");
     
     // Filtro de búsqueda por nombre o cédula (aplicado después del populate)
     let consentimientosFiltrados = consentimientos;
@@ -146,7 +146,7 @@ router.get("/buscar", async (req, res) => {
     // Buscar consentimientos de esos pacientes
     const consentimientos = await ConsentimientoPerinatal.find({
       paciente: { $in: pacientes.map(p => p._id) }
-    }).populate("paciente");
+    }).populate("paciente", "nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto");
 
     console.log("Consentimientos encontrados:", consentimientos);
 
@@ -159,7 +159,7 @@ router.get("/buscar", async (req, res) => {
 // Obtener consentimiento por ID
 router.get("/:id", async (req, res) => {
   try {
-    const consentimiento = await ConsentimientoPerinatal.findById(req.params.id).populate("paciente");
+    const consentimiento = await ConsentimientoPerinatal.findById(req.params.id).populate("paciente", "nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto");
     if (!consentimiento) return res.status(404).json({ error: "No encontrado" });
     res.json(consentimiento);
   } catch (error) {
@@ -171,7 +171,7 @@ router.get("/:id", async (req, res) => {
 router.get("/paciente/:pacienteId", async (req, res) => {
   try {
     console.log('Buscando consentimientos para paciente ID:', req.params.pacienteId);
-    const consentimiento = await ConsentimientoPerinatal.find({ paciente: req.params.pacienteId }).populate("paciente");
+    const consentimiento = await ConsentimientoPerinatal.find({ paciente: req.params.pacienteId }).populate("paciente", "nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto");
     console.log('Consentimientos encontrados:', consentimiento.length);
     console.log('IDs de pacientes en consentimientos:', consentimiento.map(c => c.paciente?._id || c.paciente));
     res.json(consentimiento);

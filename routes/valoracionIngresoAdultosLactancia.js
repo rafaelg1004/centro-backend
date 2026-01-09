@@ -104,9 +104,10 @@ router.get('/', async (req, res) => {
     
     // Obtener valoraciones con paginación
     const valoraciones = await Valoracion.find(query)
-      .sort({ 
+      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .sort({
         nombres: 1,
-        createdAt: -1 
+        createdAt: -1
       })
       .skip(skip)
       .limit(limiteNum);
@@ -165,7 +166,9 @@ router.get('/buscar', async (req, res) => {
         { nombres: { $regex: q, $options: "i" } },
         { cedula: { $regex: q, $options: "i" } }
       ]
-    }).limit(20);
+    })
+    .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+    .limit(20);
     res.json(valoraciones);
   } catch (e) {
     console.error("Error en /buscar:", e);
@@ -177,7 +180,8 @@ router.get('/buscar', async (req, res) => {
 // Obtener una valoración por ID
 router.get('/:id', async (req, res) => {
   try {
-    const valoracion = await Valoracion.findById(req.params.id);
+    const valoracion = await Valoracion.findById(req.params.id)
+      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto');
     res.json(valoracion);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoración', error });

@@ -2,6 +2,35 @@ const express = require('express');
 const router = express.Router();
 const ValoracionIngreso = require('../models/ValoracionIngreso');
 const { eliminarImagenesValoracion } = require('../utils/s3Utils');
+const logger = require('../utils/logger');
+
+// Middleware para logging de acceso a valoraciones
+const logAccesoValoracionMiddleware = (accion) => {
+  return (req, res, next) => {
+    const usuario = (req.usuario && req.usuario.usuario) ? req.usuario.usuario : 'desconocido';
+    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    const valoracionId = req.params.id || 'multiple';
+    let pacienteId = 'desconocido';
+    if (req.params.pacienteId) pacienteId = req.params.pacienteId;
+    else if (req.body && req.body.paciente) pacienteId = req.body.paciente;
+    else if (req.query && req.query.pacienteId) pacienteId = req.query.pacienteId;
+
+    logger.logValoracion(accion, {
+      user: usuario,
+      paciente: pacienteId,
+      valoracion: valoracionId,
+      ip: clientIP,
+      userAgent,
+      details: {
+        metodo: req.method,
+        endpoint: req.originalUrl
+      }
+    });
+
+    next();
+  };
+};
 
 // Middleware para validar que no se guarden imágenes base64
 const validarImagenes = (req, res, next) => {
@@ -143,7 +172,7 @@ router.post('/', validarImagenes, async (req, res) => {
 });
 
 // Obtener todas las valoraciones (con filtros opcionales y paginación)
-router.get('/', async (req, res) => {
+router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req, res) => {
   try {
     const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 15 } = req.query;
     const paginaNum = parseInt(pagina);
@@ -197,7 +226,7 @@ router.get('/', async (req, res) => {
 
     // Obtener TODAS las valoraciones para ordenamiento global
     let todasLasValoraciones = await ValoracionIngreso.find(query)
-      .populate('paciente', 'nombres apellidos registroCivil nombreMadre');
+      .populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante');
     
     // Ordenar alfabéticamente TODAS las valoraciones (ordenamiento global)
     todasLasValoraciones.sort((a, b) => {
@@ -303,7 +332,7 @@ router.get('/verificar/:pacienteId', async (req, res) => {
 // Obtener valoraciones por paciente (solo para niños - ValoracionIngreso)
 router.get('/paciente/:pacienteId', async (req, res) => {
   try {
-    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente', 'nombres apellidos registroCivil nombreMadre').sort({ createdAt: -1 });
+    const valoraciones = await ValoracionIngreso.find({ paciente: req.params.pacienteId }).populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante').sort({ createdAt: -1 });
     res.json(valoraciones);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoraciones del paciente', error });
@@ -373,9 +402,9 @@ router.get('/adulto/:pacienteId', async (req, res) => {
 });
 
 // Obtener una valoración por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', logAccesoValoracionMiddleware('CONSULTAR_VALORACION'), async (req, res) => {
   try {
-    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente', 'nombres apellidos registroCivil nombreMadre');
+    const valoracion = await ValoracionIngreso.findById(req.params.id).populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante');
     res.json(valoracion);
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al obtener valoración', error });
@@ -383,7 +412,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Eliminar una valoración
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', logAccesoValoracionMiddleware('ELIMINAR_VALORACION'), async (req, res) => {
   try {
     // Primero obtener la valoración para acceder a las imágenes
     const valoracion = await ValoracionIngreso.findById(req.params.id);
@@ -418,7 +447,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Actualizar una valoración por ID
-router.put('/:id', validarImagenes, async (req, res) => {
+router.put('/:id', logAccesoValoracionMiddleware('ACTUALIZAR_VALORACION'), validarImagenes, async (req, res) => {
   try {
     // Obtener la valoración actual para comparar imágenes
     const valoracionActual = await ValoracionIngreso.findById(req.params.id);
