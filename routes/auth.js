@@ -5,37 +5,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const speakeasy = require("speakeasy");
 const qrcode = require("qrcode");
-const fs = require("fs");
-const path = require("path");
-
-// Función para registrar logs de seguridad
-function logSeguridad(tipo, usuario, detalles = {}) {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    tipo,
-    usuario: usuario || 'desconocido',
-    ip: detalles.ip || 'N/A',
-    userAgent: detalles.userAgent || 'N/A',
-    ...detalles
-  };
-
-  const logFile = path.join(__dirname, '../logs/seguridad.log');
-  const logDir = path.dirname(logFile);
-
-  // Crear directorio si no existe
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-
-  const logLine = JSON.stringify(logEntry) + '\n';
-
-  try {
-    fs.appendFileSync(logFile, logLine);
-    console.log(`🔐 LOG [${tipo}]: ${usuario || 'desconocido'} - ${detalles.mensaje || 'Sin mensaje'}`);
-  } catch (error) {
-    console.error('❌ Error escribiendo log de seguridad:', error);
-  }
-}
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -74,11 +44,14 @@ router.post("/login", async (req, res) => {
     }
 
     if (!usuarioDoc) {
-      logSeguridad('LOGIN_FALLIDO', usuario || email, {
+      logger.logAuth('LOGIN_FALLIDO', {
+        user: usuario || email,
         ip: clientIP,
         userAgent,
-        mensaje: 'Usuario no encontrado',
-        tipoFallo: 'usuario_no_existe'
+        details: {
+          mensaje: 'Usuario no encontrado',
+          tipoFallo: 'usuario_no_existe'
+        }
       });
       return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
     }
@@ -86,11 +59,14 @@ router.post("/login", async (req, res) => {
     // Verificar si el usuario está bloqueado
     if (usuarioDoc.bloqueadoHasta && usuarioDoc.bloqueadoHasta > new Date()) {
       const tiempoRestante = Math.ceil((usuarioDoc.bloqueadoHasta - new Date()) / 1000 / 60);
-      logSeguridad('LOGIN_BLOQUEADO', usuarioDoc.usuario, {
+      logger.logAuth('LOGIN_BLOQUEADO', {
+        user: usuarioDoc.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: `Cuenta bloqueada - tiempo restante: ${tiempoRestante} minutos`,
-        tiempoRestante
+        details: {
+          mensaje: `Cuenta bloqueada - tiempo restante: ${tiempoRestante} minutos`,
+          tiempoRestante
+        }
       });
       return res.status(429).json({
         error: `Cuenta bloqueada temporalmente. Intente nuevamente en ${tiempoRestante} minutos.`
@@ -107,11 +83,14 @@ router.post("/login", async (req, res) => {
         usuarioDoc.bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
         usuarioDoc.intentosFallidos = 0;
         await usuarioDoc.save();
-        logSeguridad('CUENTA_BLOQUEADA', usuarioDoc.usuario, {
+        logger.logAuth('CUENTA_BLOQUEADA', {
+          user: usuarioDoc.usuario,
           ip: clientIP,
           userAgent,
-          mensaje: 'Cuenta bloqueada por múltiples intentos fallidos',
-          intentosFallidos: 5
+          details: {
+            mensaje: 'Cuenta bloqueada por múltiples intentos fallidos',
+            intentosFallidos: 5
+          }
         });
         return res.status(429).json({
           error: "Cuenta bloqueada por múltiples intentos fallidos. Intente nuevamente en 15 minutos."
@@ -119,12 +98,15 @@ router.post("/login", async (req, res) => {
       }
 
       await usuarioDoc.save();
-      logSeguridad('LOGIN_FALLIDO', usuarioDoc.usuario, {
+      logger.logAuth('LOGIN_FALLIDO', {
+        user: usuarioDoc.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: 'Contraseña incorrecta',
-        tipoFallo: 'password_incorrecta',
-        intentosFallidos: usuarioDoc.intentosFallidos
+        details: {
+          mensaje: 'Contraseña incorrecta',
+          tipoFallo: 'password_incorrecta',
+          intentosFallidos: usuarioDoc.intentosFallidos
+        }
       });
       return res.status(401).json({ error: "Usuario o contraseña incorrectos" });
     }
@@ -134,11 +116,14 @@ router.post("/login", async (req, res) => {
     usuarioDoc.ultimoAcceso = new Date();
     await usuarioDoc.save();
 
-    logSeguridad('LOGIN_EXITOSO', usuarioDoc.usuario, {
+    logger.logAuth('LOGIN_EXITOSO', {
+      user: usuarioDoc.usuario,
       ip: clientIP,
       userAgent,
-      mensaje: 'Login exitoso - primera fase',
-      rol: usuarioDoc.rol
+      details: {
+        mensaje: 'Login exitoso - primera fase',
+        rol: usuarioDoc.rol
+      }
     });
 
     // Verifica que el secreto JWT esté definido
@@ -162,11 +147,14 @@ router.post("/login", async (req, res) => {
 
     // Si 2FA está habilitado, requerir verificación adicional
     if (usuarioDoc.twoFactorEnabled) {
-      logSeguridad('LOGIN_2FA_REQUERIDO', usuarioDoc.usuario, {
+      logger.logAuth('LOGIN_2FA_REQUERIDO', {
+        user: usuarioDoc.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: '2FA requerido para completar login',
-        rol: usuarioDoc.rol
+        details: {
+          mensaje: '2FA requerido para completar login',
+          rol: usuarioDoc.rol
+        }
       });
       return res.json({
         token,
@@ -177,11 +165,14 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    logSeguridad('LOGIN_COMPLETADO', usuarioDoc.usuario, {
+    logger.logAuth('LOGIN_COMPLETADO', {
+      user: usuarioDoc.usuario,
       ip: clientIP,
       userAgent,
-      mensaje: 'Login completado sin 2FA',
-      rol: usuarioDoc.rol
+      details: {
+        mensaje: 'Login completado sin 2FA',
+        rol: usuarioDoc.rol
+      }
     });
 
     res.json({
@@ -192,11 +183,14 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Error en login:", error);
-    logSeguridad('LOGIN_ERROR', usuario || email, {
+    logger.logAuth('LOGIN_ERROR', {
+      user: usuario || email,
       ip: clientIP,
       userAgent,
-      mensaje: `Error en login: ${error.message}`,
-      error: error.message
+      details: {
+        mensaje: `Error en login: ${error.message}`,
+        error: error.message
+      }
     });
     res.status(500).json({ error: "Error en el servidor" });
   }
@@ -255,12 +249,15 @@ const verificarToken = (rolesPermitidos = []) => {
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     if (!token) {
-      logSeguridad('ACCESO_SIN_TOKEN', 'desconocido', {
+      logger.logAuth('ACCESO_SIN_TOKEN', {
+        user: 'desconocido',
         ip: clientIP,
         userAgent,
-        mensaje: 'Intento de acceso sin token de autenticación',
-        endpoint: req.originalUrl,
-        metodo: req.method
+        details: {
+          mensaje: 'Intento de acceso sin token de autenticación',
+          endpoint: req.originalUrl,
+          metodo: req.method
+        }
       });
       return res.status(401).json({ error: 'Token de autenticación requerido' });
     }
@@ -270,38 +267,47 @@ const verificarToken = (rolesPermitidos = []) => {
 
       // Verificar si el usuario tiene un rol permitido
       if (rolesPermitidos.length > 0 && !rolesPermitidos.includes(decoded.rol)) {
-        logSeguridad('ACCESO_DENEGADO', decoded.usuario, {
+        logger.logAuth('ACCESO_DENEGADO', {
+          user: decoded.usuario,
           ip: clientIP,
           userAgent,
-          mensaje: `Acceso denegado - rol insuficiente`,
-          endpoint: req.originalUrl,
-          metodo: req.method,
-          rolUsuario: decoded.rol,
-          rolesRequeridos: rolesPermitidos
+          details: {
+            mensaje: `Acceso denegado - rol insuficiente`,
+            endpoint: req.originalUrl,
+            metodo: req.method,
+            rolUsuario: decoded.rol,
+            rolesRequeridos: rolesPermitidos
+          }
         });
         return res.status(403).json({
           error: 'Acceso denegado. No tienes permisos suficientes para esta acción.'
         });
       }
 
-      logSeguridad('ACCESO_PERMITIDO', decoded.usuario, {
+      logger.logAuth('ACCESO_PERMITIDO', {
+        user: decoded.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: 'Acceso permitido a endpoint protegido',
-        endpoint: req.originalUrl,
-        metodo: req.method,
-        rol: decoded.rol
+        details: {
+          mensaje: 'Acceso permitido a endpoint protegido',
+          endpoint: req.originalUrl,
+          metodo: req.method,
+          rol: decoded.rol
+        }
       });
 
       req.usuario = decoded;
       next();
     } catch (error) {
-      logSeguridad('TOKEN_INVALIDO', 'desconocido', {
+      logger.logAuth('TOKEN_INVALIDO', {
+        user: 'desconocido',
         ip: clientIP,
         userAgent,
-        mensaje: `Token inválido: ${error.message}`,
-        endpoint: req.originalUrl,
-        metodo: req.method
+        details: {
+          mensaje: `Token inválido: ${error.message}`,
+          endpoint: req.originalUrl,
+          metodo: req.method
+        }
       });
       return res.status(401).json({ error: 'Token inválido o expirado' });
     }
@@ -384,11 +390,14 @@ router.post("/verify-2fa-login", async (req, res) => {
 
     const usuario = await Usuario.findById(decoded.id);
     if (!usuario || !usuario.twoFactorEnabled || !usuario.twoFactorSecret) {
-      logSeguridad('2FA_VERIFICACION_FALLIDA', decoded.usuario, {
+      logger.logAuth('2FA_VERIFICACION_FALLIDA', {
+        user: decoded.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: 'Configuración 2FA inválida',
-        tipoFallo: 'configuracion_invalida'
+        details: {
+          mensaje: 'Configuración 2FA inválida',
+          tipoFallo: 'configuracion_invalida'
+        }
       });
       return res.status(400).json({ error: "Configuración 2FA inválida" });
     }
@@ -401,11 +410,14 @@ router.post("/verify-2fa-login", async (req, res) => {
     });
 
     if (!verificado) {
-      logSeguridad('2FA_VERIFICACION_FALLIDA', usuario.usuario, {
+      logger.logAuth('2FA_VERIFICACION_FALLIDA', {
+        user: usuario.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: 'Código 2FA inválido',
-        tipoFallo: 'codigo_invalido'
+        details: {
+          mensaje: 'Código 2FA inválido',
+          tipoFallo: 'codigo_invalido'
+        }
       });
       return res.status(400).json({ error: "Código 2FA inválido" });
     }
@@ -424,11 +436,14 @@ router.post("/verify-2fa-login", async (req, res) => {
       { expiresIn: "2h" }
     );
 
-    logSeguridad('LOGIN_COMPLETADO_2FA', usuario.usuario, {
+    logger.logAuth('LOGIN_COMPLETADO_2FA', {
+      user: usuario.usuario,
       ip: clientIP,
       userAgent,
-      mensaje: 'Login completado con 2FA',
-      rol: usuario.rol
+      details: {
+        mensaje: 'Login completado con 2FA',
+        rol: usuario.rol
+      }
     });
 
     res.json({
@@ -439,11 +454,14 @@ router.post("/verify-2fa-login", async (req, res) => {
     });
   } catch (error) {
     console.error("Error en verificación 2FA login:", error);
-    logSeguridad('2FA_VERIFICACION_ERROR', 'desconocido', {
+    logger.logAuth('2FA_VERIFICACION_ERROR', {
+      user: 'desconocido',
       ip: clientIP,
       userAgent,
-      mensaje: `Error en verificación 2FA: ${error.message}`,
-      error: error.message
+      details: {
+        mensaje: `Error en verificación 2FA: ${error.message}`,
+        error: error.message
+      }
     });
     res.status(500).json({ error: "Error en el servidor" });
   }
@@ -476,19 +494,25 @@ router.get("/me", verificarToken(), async (req, res) => {
   try {
     const usuario = await Usuario.findById(req.usuario.id).select('-passwordHash -twoFactorSecret');
     if (!usuario) {
-      logSeguridad('INFO_USUARIO_NO_ENCONTRADO', req.usuario.usuario, {
+      logger.logAuth('INFO_USUARIO_NO_ENCONTRADO', {
+        user: req.usuario.usuario,
         ip: clientIP,
         userAgent,
-        mensaje: 'Usuario no encontrado al obtener información'
+        details: {
+          mensaje: 'Usuario no encontrado al obtener información'
+        }
       });
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    logSeguridad('INFO_USUARIO_CONSULTADA', usuario.usuario, {
+    logger.logAuth('INFO_USUARIO_CONSULTADA', {
+      user: usuario.usuario,
       ip: clientIP,
       userAgent,
-      mensaje: 'Información del usuario consultada',
-      rol: usuario.rol
+      details: {
+        mensaje: 'Información del usuario consultada',
+        rol: usuario.rol
+      }
     });
 
     res.json({
@@ -502,11 +526,14 @@ router.get("/me", verificarToken(), async (req, res) => {
     });
   } catch (error) {
     console.error("Error obteniendo info usuario:", error);
-    logSeguridad('ERROR_INFO_USUARIO', req.usuario.usuario, {
+    logger.logAuth('ERROR_INFO_USUARIO', {
+      user: req.usuario.usuario,
       ip: clientIP,
       userAgent,
-      mensaje: `Error obteniendo info usuario: ${error.message}`,
-      error: error.message
+      details: {
+        mensaje: `Error obteniendo info usuario: ${error.message}`,
+        error: error.message
+      }
     });
     res.status(500).json({ error: "Error en el servidor" });
   }

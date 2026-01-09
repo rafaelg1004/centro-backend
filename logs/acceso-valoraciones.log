@@ -1,0 +1,1 @@
+{"timestamp":"2025-11-24T22:11:09.531Z","tipo":"ACCESO_VALORACION","usuario":"desconocido","valoracionId":"multiple","pacienteId":"desconocido","ip":"127.0.0.1","userAgent":"curl/8.5.0","accion":"LISTAR_VALORACIONES","metodo":"GET","endpoint":"/api/valoraciones"}

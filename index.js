@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const logger = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,6 +11,21 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
+
+// Logger middleware solo para operaciones de modificación y login
+app.use((req, res, next) => {
+  // Solo registrar operaciones de modificación (POST, PUT, DELETE) y login
+  const shouldLog = ['POST', 'PUT', 'DELETE'].includes(req.method) ||
+                    req.path.includes('/auth/login') ||
+                    req.path.includes('/auth/verify-2fa-login');
+
+  if (shouldLog) {
+    // Usar el middleware del logger solo para estas operaciones
+    return logger.middleware()(req, res, next);
+  }
+
+  next();
+});
 
 // Importa los modelos ANTES de conectar a la base de datos
 const Paciente = require('./models/Paciente');
@@ -433,6 +449,69 @@ app.get('/api/debug-list-valoraciones-piso-pelvico', async (req, res) => {
   } catch (error) {
     console.error('Error listando valoraciones piso pélvico:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Health check endpoint para monitoreo
+app.get('/api/health', async (req, res) => {
+  try {
+    // Verificar conexión a base de datos
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+
+    // Información básica del sistema
+    const healthCheck = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      database: {
+        status: dbStatus,
+        name: mongoose.connection.name
+      },
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0'
+    };
+
+    // Si la BD no está conectada, cambiar status
+    if (dbStatus !== 'connected') {
+      healthCheck.status = 'error';
+      res.status(503);
+    }
+
+    res.json(healthCheck);
+  } catch (error) {
+    console.error('Error en health check:', error);
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Endpoint para consultar logs (solo para debugging)
+app.get('/api/logs', async (req, res) => {
+  try {
+    const Log = require('./models/Log');
+    const { limit = 50, category, level, user } = req.query;
+
+    let query = {};
+    if (category) query.category = category;
+    if (level) query.level = level;
+    if (user) query.user = user;
+
+    const logs = await Log.find(query)
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .select('-__v');
+
+    res.json({
+      total: logs.length,
+      logs: logs
+    });
+  } catch (error) {
+    console.error('Error obteniendo logs:', error);
+    res.status(500).json({ error: 'Error obteniendo logs' });
   }
 });
 
