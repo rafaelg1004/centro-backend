@@ -336,7 +336,9 @@ const verificarToken = (rolesPermitidos = []) => {
 // Ruta para habilitar 2FA
 router.post("/enable-2fa", verificarToken(['administracion']), async (req, res) => {
   try {
-    const usuario = await Usuario.findById(req.usuario.id);
+    const { userId } = req.body;
+    const targetUserId = userId || req.usuario.id;
+    const usuario = await Usuario.findById(targetUserId);
     if (!usuario) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
@@ -554,6 +556,67 @@ router.get("/me", verificarToken(), async (req, res) => {
         error: error.message
       }
     });
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para obtener lista de usuarios (solo admin)
+router.get("/users", verificarToken(['administracion']), async (req, res) => {
+  try {
+    const usuarios = await Usuario.find({}, '-passwordHash -twoFactorSecret');
+    res.json(usuarios);
+  } catch (error) {
+    console.error("Error obteniendo usuarios:", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para bloquear usuario
+router.post("/block-user/:id", verificarToken(['administracion']), async (req, res) => {
+  try {
+    const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    usuario.bloqueadoHasta = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+    usuario.intentosFallidos = 0;
+    await usuario.save();
+    res.json({ mensaje: "Usuario bloqueado por 15 minutos" });
+  } catch (error) {
+    console.error("Error bloqueando usuario:", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para desbloquear usuario
+router.post("/unblock-user/:id", verificarToken(['administracion']), async (req, res) => {
+  try {
+    const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    usuario.bloqueadoHasta = null;
+    await usuario.save();
+    res.json({ mensaje: "Usuario desbloqueado" });
+  } catch (error) {
+    console.error("Error desbloqueando usuario:", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para deshabilitar 2FA de un usuario
+router.post("/disable-2fa/:id", verificarToken(['administracion']), async (req, res) => {
+  try {
+    const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    usuario.twoFactorEnabled = false;
+    usuario.twoFactorSecret = null;
+    await usuario.save();
+    res.json({ mensaje: "Autenticación de dos factores deshabilitada" });
+  } catch (error) {
+    console.error("Error deshabilitando 2FA:", error);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
