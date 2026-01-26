@@ -6,10 +6,98 @@
 const mongoose = require('mongoose');
 const ripsConfig = require('./ripsConfig');
 
+// Cache de códigos CUPS cargados de la BD
+let codigosCUPSCache = null;
+let cacheTimestamp = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
 class RIPSConverter {
   constructor() {
     this.validationErrors = [];
     this.validationWarnings = [];
+    this.codigosCUPS = null;
+  }
+
+  /**
+   * Carga los códigos CUPS desde la base de datos
+   * Usa cache para evitar múltiples consultas
+   */
+  async cargarCodigosCUPS() {
+    try {
+      // Verificar si el cache es válido
+      const ahora = Date.now();
+      if (codigosCUPSCache && cacheTimestamp && (ahora - cacheTimestamp) < CACHE_TTL) {
+        this.codigosCUPS = codigosCUPSCache;
+        return;
+      }
+
+      // Intentar cargar desde BD
+      const CodigoCUPS = require('./models/CodigoCUPS');
+      const codigos = await CodigoCUPS.find({ activo: true });
+
+      if (codigos && codigos.length > 0) {
+        // Convertir a un mapa por claveInterna para acceso rápido
+        this.codigosCUPS = {};
+        for (const codigo of codigos) {
+          if (codigo.claveInterna) {
+            this.codigosCUPS[codigo.claveInterna] = codigo;
+          }
+        }
+        // Actualizar cache
+        codigosCUPSCache = this.codigosCUPS;
+        cacheTimestamp = ahora;
+        console.log(`📋 CUPS cargados desde BD: ${codigos.length} códigos`);
+      } else {
+        this.codigosCUPS = null;
+        console.log('ℹ️ No hay códigos CUPS en BD, usando ripsConfig como fallback');
+      }
+    } catch (error) {
+      console.log('ℹ️ Error cargando CUPS de BD, usando ripsConfig:', error.message);
+      this.codigosCUPS = null;
+    }
+  }
+
+  /**
+   * Obtiene el código CUPS por clave interna
+   * Primero busca en BD, si no existe usa ripsConfig
+   */
+  getCodigoCUPSDinamico(claveInterna) {
+    // Intentar obtener de la BD cacheada
+    if (this.codigosCUPS && this.codigosCUPS[claveInterna]) {
+      return this.codigosCUPS[claveInterna].codigo;
+    }
+    // Fallback a ripsConfig
+    return ripsConfig.getCodigoCUPS(claveInterna);
+  }
+
+  /**
+   * Obtiene el valor del servicio por clave interna
+   */
+  getValorServicioDinamico(claveInterna) {
+    if (this.codigosCUPS && this.codigosCUPS[claveInterna]) {
+      return this.codigosCUPS[claveInterna].valor;
+    }
+    return ripsConfig.getValorServicio(claveInterna);
+  }
+
+  /**
+   * Obtiene la finalidad por clave interna
+   */
+  getFinalidadDinamica(claveInterna) {
+    if (this.codigosCUPS && this.codigosCUPS[claveInterna]) {
+      return this.codigosCUPS[claveInterna].finalidad;
+    }
+    return ripsConfig.getFinalidad(claveInterna);
+  }
+
+  /**
+   * Obtiene el diagnóstico CIE por clave interna
+   */
+  getDiagnosticoCIEDinamico(claveInterna) {
+    if (this.codigosCUPS && this.codigosCUPS[claveInterna]) {
+      return this.codigosCUPS[claveInterna].diagnosticoCIE;
+    }
+    return ripsConfig.getDiagnosticoCIE(claveInterna);
   }
 
   /**
@@ -25,14 +113,17 @@ class RIPSConverter {
     this.validationWarnings = [];
 
     try {
+      // Cargar códigos CUPS desde BD (con cache)
+      await this.cargarCodigosCUPS();
+
       // Validar estructura básica de entrada
-      if (!data.numFactura || !Array.isArray(data.pacientes)) {
-        throw new Error('Datos de entrada inválidos: se requiere numFactura y array de pacientes');
+      if (!data.numFactura && !data.sinFactura) {
+        throw new Error('Datos de entrada inválidos: se requiere numFactura o marcar sin factura');
       }
 
       const ripsData = {
         numDocumentoldObligado: this.getNITFacturador(),
-        numFactura: data.numFactura,
+        numFactura: data.sinFactura ? null : data.numFactura,
         tipoNota: null,
         numNota: null,
         usuarios: [],
@@ -54,7 +145,7 @@ class RIPSConverter {
       }
 
       // Validaciones finales
-      this.validateRIPS(ripsData);
+      this.validateRIPS(ripsData, data.sinFactura);
 
       return {
         rips: ripsData,
@@ -79,6 +170,13 @@ class RIPSConverter {
    */
   getNITFacturador() {
     return ripsConfig.prestador.nit;
+  }
+
+  /**
+   * Obtiene el código de servicio REPS del prestador
+   */
+  getCodigoServicioREPS() {
+    return ripsConfig.prestador.codServicioREPS || '739';
   }
 
   /**
@@ -155,6 +253,14 @@ class RIPSConverter {
         }
       }
 
+      // Convertir valoraciones de piso pélvico
+      if (pacienteData.valoracionesPisoPelvico) {
+        for (const valoracion of pacienteData.valoracionesPisoPelvico) {
+          const procedimiento = await this.convertValoracionPisoPelvico(valoracion, pacienteData);
+          if (procedimiento) servicios.procedimientos.push(procedimiento);
+        }
+      }
+
     } catch (error) {
       this.validationErrors.push(`Error convirtiendo servicios: ${error.message}`);
     }
@@ -167,18 +273,18 @@ class RIPSConverter {
    */
   async convertConsulta(valoracion, pacienteData) {
     try {
-      const tipoConsulta = this.determinarTipoConsulta(valoracion.motivoDeConsulta);
-      const finalidad = ripsConfig.getFinalidad(tipoConsulta);
+      const tipoConsultaKey = this.determinarTipoConsulta(valoracion.motivoDeConsulta);
+      const finalidad = this.getFinalidadDinamica(tipoConsultaKey);
       const diagnostico = this.determinarDiagnosticoCIE(valoracion.motivoDeConsulta);
 
       return {
         codPrestador: this.getCodigoPrestador(),
         fechalnicioAtencion: this.formatFechaRIPS(valoracion.fecha),
         numAutorizacion: valoracion.numAutorizacion || null,
-        codConsulta: ripsConfig.getCodigoCUPS('consultaGeneral'),
+        codConsulta: this.getCodigoCUPSDinamico(tipoConsultaKey),
         modalidadGrupoServicioTecSal: ripsConfig.modalidades.consultaExterna,
         grupoServicios: ripsConfig.gruposServicios.consultas,
-        codServicio: 1, // Fisioterapia
+        codServicio: this.getCodigoServicioREPS(), 
         finalidadTecnologiaSalud: finalidad,
         causaMotivoAtencion: ripsConfig.causasMotivoAtencion.consultaExterna,
         codDiagnosticoPrincipal: diagnostico,
@@ -188,7 +294,7 @@ class RIPSConverter {
         tipoDiagnosticoPrincipal: '01', // Confirmado
         tipoDocumentoldentificacion: valoracion.profesionalTratante?.tipoDocumento || 'CC',
         numDocumentoldentificacion: valoracion.profesionalTratante?.numeroDocumento || '00000000',
-        vrServicio: valoracion.vrServicio || ripsConfig.getValorServicio(tipoConsulta),
+        vrServicio: valoracion.vrServicio || this.getValorServicioDinamico(tipoConsultaKey),
         tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
         valorPagoModerador: 0,
         numFEVPagoModerador: null,
@@ -205,27 +311,27 @@ class RIPSConverter {
    */
   async convertProcedimiento(clase, pacienteData) {
     try {
-      const tipoProcedimiento = this.determinarTipoProcedimiento(clase.titulo);
-      const finalidad = ripsConfig.getFinalidad('terapiaFisica');
-      const diagnostico = ripsConfig.getDiagnosticoCIE('fisioterapiaGeneral');
+      const tipoProcedimientoKey = this.determinarTipoProcedimiento(clase.titulo);
+      const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
+      const diagnostico = this.determinarDiagnosticoCIE(clase.titulo); // Usar el título para determinar el diagnóstico
 
       return {
         codPrestador: this.getCodigoPrestador(),
         fechalnicioAtencion: this.formatFechaRIPS(clase.fecha),
         idMIPRES: null,
         numAutorizacion: null,
-        codProcedimiento: ripsConfig.getCodigoCUPS(tipoProcedimiento),
+        codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
         viaIngresoServicioSalud: '01', // Consulta externa
         modalidadGrupoServicioTecSal: ripsConfig.modalidades.individual,
         grupoServicios: ripsConfig.gruposServicios.procedimientos,
-        codServicio: 1, // Fisioterapia
+        codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
         tipoDocumentoldentificacion: clase.instructor?.tipoDocumento || 'CC',
         numDocumentoldentificacion: clase.instructor?.numeroDocumento || '00000000',
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado: null,
         codComplicacion: null,
-        vrServicio: clase.vrServicio || ripsConfig.getValorServicio(tipoProcedimiento),
+        vrServicio: clase.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
         tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
         valorPagoModerador: 0,
         numFEVPagoModerador: null,
@@ -242,26 +348,27 @@ class RIPSConverter {
    */
   async convertSesionPerinatal(sesion, pacienteData) {
     try {
-      const finalidad = ripsConfig.getFinalidad('preparacionParto');
-      const diagnostico = ripsConfig.getDiagnosticoCIE('parto');
+      const tipoProcedimientoKey = this.determinarTipoProcedimiento('preparación parto');
+      const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
+      const diagnostico = this.determinarDiagnosticoCIE('parto');
 
       return {
         codPrestador: this.getCodigoPrestador(),
         fechalnicioAtencion: this.formatFechaRIPS(sesion.fecha),
         idMIPRES: null,
         numAutorizacion: null,
-        codProcedimiento: ripsConfig.getCodigoCUPS('preparacionParto'),
+        codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
         viaIngresoServicioSalud: '01', // Consulta externa
         modalidadGrupoServicioTecSal: ripsConfig.modalidades.individual,
         grupoServicios: ripsConfig.gruposServicios.procedimientos,
-        codServicio: 1, // Fisioterapia
+        codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
         tipoDocumentoldentificacion: sesion.profesional?.tipoDocumento || 'CC',
         numDocumentoldentificacion: sesion.profesional?.numeroDocumento || '00000000',
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado: null,
         codComplicacion: null,
-        vrServicio: sesion.vrServicio || ripsConfig.getValorServicio('preparacionParto'),
+        vrServicio: sesion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
         tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
         valorPagoModerador: 0,
         numFEVPagoModerador: null,
@@ -271,6 +378,58 @@ class RIPSConverter {
       this.validationErrors.push(`Error convirtiendo sesión perinatal: ${error.message}`);
       return null;
     }
+  }
+
+  /**
+   * Convierte valoración de piso pélvico a procedimiento RIPS
+   */
+  async convertValoracionPisoPelvico(valoracion, pacienteData) {
+    try {
+      const tipoProcedimientoKey = this.determinarTipoProcedimiento('piso pélvico');
+      const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
+      const diagnostico = this.determinarDiagnosticoPisoPelvico(valoracion);
+
+      return {
+        codPrestador: this.getCodigoPrestador(),
+        fechalnicioAtencion: this.formatFechaRIPS(valoracion.fecha),
+        idMIPRES: null,
+        numAutorizacion: null,
+        codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
+        viaIngresoServicioSalud: '01', // Consulta externa
+        modalidadGrupoServicioTecSal: ripsConfig.modalidades.individual,
+        grupoServicios: ripsConfig.gruposServicios.procedimientos,
+        codServicio: this.getCodigoServicioREPS(),
+        finalidadTecnologiaSalud: finalidad,
+        tipoDocumentoldentificacion: 'CC',
+        numDocumentoldentificacion: '00000000',
+        codDiagnosticoPrincipal: diagnostico,
+        codDiagnosticoRelacionado: null,
+        codComplicacion: null,
+        vrServicio: valoracion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
+        tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
+        valorPagoModerador: 0,
+        numFEVPagoModerador: null,
+        consecutivo: 1
+      };
+    } catch (error) {
+      this.validationErrors.push(`Error convirtiendo valoración piso pélvico: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Determina el diagnóstico CIE-10 según la valoración de piso pélvico
+   */
+  determinarDiagnosticoPisoPelvico(valoracion) {
+    // Priorizar según condiciones encontradas
+    if (valoracion.incontinenciaUrinaria) {
+      return ripsConfig.getDiagnosticoCIE('incontinenciaUrinaria');
+    }
+    if (valoracion.bultoVaginal) {
+      return ripsConfig.getDiagnosticoCIE('prolapsoGenital');
+    }
+    // Default para valoración de piso pélvico
+    return ripsConfig.getDiagnosticoCIE('fisioterapiaGeneral');
   }
 
   /**
@@ -297,45 +456,43 @@ class RIPSConverter {
     return mapaTipoUsuario[regimenAfiliacion] || '04';
   }
 
+  /**
+   * Determina el tipo de consulta según motivo
+   */
   determinarTipoConsulta(motivo) {
-    if (!motivo) return 'consultaGeneral';
-
-    const motivoLower = motivo.toLowerCase();
-    if (motivoLower.includes('prenatal') || motivoLower.includes('embarazo')) {
-      return 'consultaPrenatal';
-    }
-    if (motivoLower.includes('parto') || motivoLower.includes('puerperio') || motivoLower.includes('postnatal')) {
-      return 'consultaPostnatal';
-    }
-    if (motivoLower.includes('lactancia')) {
-      return 'consultaLactancia';
-    }
-    return 'consultaGeneral';
+    // Según instrucciones: Todas las valoraciones apuntan a Consulta Fisiatría 1ra Vez ('890264')
+    // Las de control o seguimiento usarían '890384'
+    return 'consultaFisiatriaPrimeraVez'; 
   }
 
+  /**
+   * Determina el tipo de procedimiento según título/descripción
+   */
   determinarTipoProcedimiento(titulo) {
-    if (!titulo) return 'terapiaFisicaIndividual';
+    if (!titulo) return 'terapiaFisicaSOD';
 
     const tituloLower = titulo.toLowerCase();
+    
+    // Reglas específicas mapeadas a códigos Res. 2706
+    if (tituloLower.includes('estimulación') || tituloLower.includes('clase') || tituloLower.includes('sensorial') || tituloLower.includes('grupal')) {
+      return 'integracionSensorial'; // 933900
+    }
+    
     if (tituloLower.includes('piso pélvico') || tituloLower.includes('piso pelvico')) {
-      return 'reeducacionPisoPelvis';
+      return 'rehabDeficienciaLeve'; // 938610 (Sesiones Rehab)
     }
-    if (tituloLower.includes('preparación parto') || tituloLower.includes('preparacion parto')) {
-      return 'preparacionParto';
+    
+    if (tituloLower.includes('preparación parto') || tituloLower.includes('preparacion parto') || tituloLower.includes('educación')) {
+      return 'consultaFisiatriaControl'; // 890384 (Educación/Control) - Si se factura como consulta
+      // O 'rehabDeficienciaLeve' si es procedimiento
     }
+    
     if (tituloLower.includes('masaje')) {
-      return 'masajeTerapeutico';
+      return 'terapiaFisicaSOD'; // 931000
     }
-    if (tituloLower.includes('electro') || tituloLower.includes('electrostimulacion')) {
-      return 'electroterapia';
-    }
-    if (tituloLower.includes('hidro')) {
-      return 'hidroterapia';
-    }
-    if (tituloLower.includes('grupal') || tituloLower.includes('colectiva')) {
-      return 'terapiaFisicaGrupal';
-    }
-    return 'terapiaFisicaIndividual';
+    
+    // Default
+    return 'terapiaFisicaSOD';
   }
 
   determinarDiagnosticoCIE(motivo) {
@@ -396,12 +553,20 @@ class RIPSConverter {
   }
 
   /**
-   * Validaciones según reglas de la Resolución 1036
+   * Validaciones según reglas de la Resolución 1036 y 2275
    */
-  validateRIPS(ripsData) {
+  validateRIPS(ripsData, sinFactura = false) {
     // RVG01: Estructura básica
-    if (!ripsData.numDocumentoldObligado || !ripsData.numFactura) {
-      this.validationErrors.push('RVG01: Falta información básica de la transacción');
+    if (!ripsData.numDocumentoldObligado) {
+      this.validationErrors.push('RVG01: Falta información básica del obligado');
+    }
+    
+    if (!sinFactura && !ripsData.numFactura) {
+      this.validationErrors.push('RVG01: Falta número de factura (obligatorio si no es reporte sin factura)');
+    }
+    
+    if (sinFactura && ripsData.numFactura !== null) {
+      this.validationErrors.push('RVG01: Para reporte sin factura, numFactura debe ser null');
     }
 
     // RVG03: Al menos un servicio

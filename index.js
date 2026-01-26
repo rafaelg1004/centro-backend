@@ -59,6 +59,7 @@ app.use('/api/consentimiento-perinatal', require('./routes/consentimientoPerinat
 app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
 app.use('/api', require('./routes/upload'));
 app.use('/api/rips', require('./routes/rips'));
+app.use('/api/cups', require('./routes/cups'));
 
 // Endpoint para eliminar firmas de S3
 const { eliminarImagenDeS3 } = require('./utils/s3Utils');

@@ -10,6 +10,7 @@ const PacienteAdulto = require('../models/PacienteAdulto');
 const ValoracionIngreso = require('../models/ValoracionIngreso');
 const Clase = require('../models/Clase');
 const SesionPerinatalPaciente = require('../models/SesionPerinatalPaciente');
+const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
 
 // Middleware de autenticación (simplificado)
 const authenticate = (req, res, next) => {
@@ -23,57 +24,77 @@ const authenticate = (req, res, next) => {
  */
 router.post('/generate', authenticate, async (req, res) => {
   try {
-    const { numFactura, pacienteIds, fechaInicio, fechaFin } = req.body;
+    const { numFactura, pacienteIds, fechaInicio, fechaFin, sinFactura } = req.body;
 
-    if (!numFactura) {
+    if (!sinFactura && !numFactura) {
       return res.status(400).json({
         success: false,
-        message: 'El número de factura es obligatorio'
+        message: 'El número de factura es obligatorio (a menos que se marque sinFactura)'
       });
     }
 
-    // Validar entrada básica
-    if (!numFactura || !Array.isArray(pacienteIds) || pacienteIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Datos inválidos: se requiere numFactura y al menos un pacienteId'
-      });
-    }
+
 
     console.log('📋 Generando RIPS para:', { numFactura, pacienteIds, fechaInicio, fechaFin });
 
+    let idsParaProcesar = pacienteIds || [];
+
+    // Si no se proporcionan IDs, buscar dinámicamente según servicios en el rango de fechas
+    if (!idsParaProcesar.length && (fechaInicio || fechaFin)) {
+      console.log('🔍 Buscando pacientes dinámicamente por servicios en el rango de fechas...');
+      
+      const fechaQuery = {
+        ...(fechaInicio || fechaFin ? {
+          fecha: {
+            ...(fechaInicio && { $gte: fechaInicio }),
+            ...(fechaFin && { $lte: fechaFin })
+          }
+        } : {})
+      };
+
+      const [
+        valoracionesNinos,
+        clases,
+        sesionesAdultos,
+        valoracionesAdultos
+      ] = await Promise.all([
+        ValoracionIngreso.find(fechaQuery).select('paciente').lean(),
+        Clase.find(fechaQuery).select('ninos.paciente').lean(),
+        SesionPerinatalPaciente.find(fechaQuery).select('paciente').lean(),
+        ValoracionPisoPelvico.find(fechaQuery).select('paciente').lean()
+      ]);
+
+      const idsEncontrados = new Set();
+      
+      valoracionesNinos.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
+      clases.forEach(c => c.ninos.forEach(n => n.paciente && idsEncontrados.add(n.paciente.toString())));
+      sesionesAdultos.forEach(s => s.paciente && idsEncontrados.add(s.paciente.toString()));
+      valoracionesAdultos.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
+
+      idsParaProcesar = Array.from(idsEncontrados);
+      console.log(`✅ IDs encontrados dinámicamente: ${idsParaProcesar.length}`);
+    }
+
+    if (idsParaProcesar.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron pacientes con servicios en el rango de fechas especificado'
+      });
+    }
+
     // Obtener pacientes de ambas colecciones
-    const query = { _id: { $in: pacienteIds } };
+    const query = { _id: { $in: idsParaProcesar } };
     const pacientesNinos = await Paciente.find(query);
     const pacientesAdultos = await PacienteAdulto.find(query);
 
     const pacientes = [...pacientesNinos, ...pacientesAdultos];
 
-    console.log(`🔍 Encontrados ${pacientes.length} pacientes de ${pacienteIds.length} solicitados`);
-    console.log('IDs encontrados:', pacientes.map(p => ({ id: p._id, tipo: p.constructor.modelName, nombre: p.nombres || p.nombre })));
-    console.log('IDs solicitados:', pacienteIds);
-
-    // Verificar que no haya problemas de populate
-    for (const paciente of pacientes) {
-      console.log(`Procesando paciente ${paciente.constructor.modelName}: ${paciente.nombres || paciente.nombre}`);
-      try {
-        // Intentar acceder a propiedades para verificar que no haya populate issues
-        const test = paciente._id;
-      } catch (error) {
-        console.error(`Error accediendo a paciente ${paciente._id}:`, error.message);
-      }
-    }
-
-    if (pacientes.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: `No se encontraron pacientes para generar RIPS. IDs solicitados: ${pacienteIds.join(', ')}`
-      });
-    }
+    console.log(`🔍 Procesando ${pacientes.length} pacientes...`);
 
     // Preparar datos para el convertidor
     const converterData = {
       numFactura,
+      sinFactura,
       pacientes: []
     };
 
@@ -87,8 +108,8 @@ router.post('/generate', authenticate, async (req, res) => {
           paciente: paciente._id,
           ...(fechaInicio || fechaFin ? {
             fecha: {
-              ...(fechaInicio && { $gte: new Date(fechaInicio) }),
-              ...(fechaFin && { $lte: new Date(fechaFin) })
+              ...(fechaInicio && { $gte: fechaInicio }),
+              ...(fechaFin && { $lte: fechaFin })
             }
           } : {})
         }).setOptions({ strictPopulate: false });
@@ -102,8 +123,8 @@ router.post('/generate', authenticate, async (req, res) => {
           'ninos.asistio': true,
           ...(fechaInicio || fechaFin ? {
             fecha: {
-              ...(fechaInicio && { $gte: new Date(fechaInicio) }),
-              ...(fechaFin && { $lte: new Date(fechaFin) })
+              ...(fechaInicio && { $gte: fechaInicio }),
+              ...(fechaFin && { $lte: fechaFin })
             }
           } : {})
         }).setOptions({ strictPopulate: false });
@@ -116,11 +137,34 @@ router.post('/generate', authenticate, async (req, res) => {
           paciente: paciente._id,
           ...(fechaInicio || fechaFin ? {
             fecha: {
-              ...(fechaInicio && { $gte: new Date(fechaInicio) }),
-              ...(fechaFin && { $lte: new Date(fechaFin) })
+              ...(fechaInicio && { $gte: fechaInicio }),
+              ...(fechaFin && { $lte: fechaFin })
             }
           } : {})
         }).setOptions({ strictPopulate: false });
+      }
+
+      // Obtener valoraciones de piso pélvico (solo para pacientes adultos)
+      let valoracionesPisoPelvico = [];
+      if (paciente.constructor.modelName === 'PacienteAdulto') {
+        valoracionesPisoPelvico = await ValoracionPisoPelvico.find({
+          paciente: paciente._id,
+          ...(fechaInicio || fechaFin ? {
+            fecha: {
+              ...(fechaInicio && { $gte: fechaInicio }),
+              ...(fechaFin && { $lte: fechaFin })
+            }
+          } : {})
+        }).setOptions({ strictPopulate: false });
+      }
+
+      // 🛑 FILTRO IMPORTANTE: Si el paciente no tiene servicios en este rango, NO incluirlo
+      if (valoracionesIngreso.length === 0 && 
+          clases.length === 0 && 
+          sesionesPerinatales.length === 0 && 
+          valoracionesPisoPelvico.length === 0) {
+        // console.log(`⏩ Saltando paciente ${paciente.nombres || paciente.nombre} - Sin servicios en el rango`);
+        continue;
       }
 
       // Mapear datos según el tipo de paciente
@@ -153,7 +197,7 @@ router.post('/generate', authenticate, async (req, res) => {
             vrServicio: c.vrServicio || 0
           })),
           sesionesPerinatales: [],
-          consecutivo: i + 1
+          consecutivo: converterData.pacientes.length + 1
         };
       } else {
         // Paciente adulto
@@ -177,7 +221,13 @@ router.post('/generate', authenticate, async (req, res) => {
             profesional: s.profesional,
             vrServicio: s.vrServicio || 0
           })),
-          consecutivo: i + 1
+          valoracionesPisoPelvico: valoracionesPisoPelvico.map(v => ({
+            fecha: v.fecha,
+            motivoConsulta: v.motivoConsulta,
+            diagnosticoFisio: v.diagnosticoFisio,
+            vrServicio: v.vrServicio || 0
+          })),
+          consecutivo: converterData.pacientes.length + 1
         };
       }
 
@@ -207,7 +257,7 @@ router.post('/generate', authenticate, async (req, res) => {
           usuariosProcesados: resultado.rips.usuarios.length,
           serviciosTecnologicos: resultado.rips.serviciosTecnologias.length,
           totalConsultas: resultado.rips.serviciosTecnologias.reduce((sum, s) => sum + s.consultas.length, 0),
-          totalProcedimientos: resultado.rips.serviciosTecnologicos.reduce((sum, s) => sum + s.procedimientos.length, 0)
+          totalProcedimientos: resultado.rips.serviciosTecnologias.reduce((sum, s) => sum + s.procedimientos.length, 0)
         },
         warnings: resultado.validationWarnings
       }
@@ -277,9 +327,10 @@ router.get('/config', authenticate, (req, res) => {
   res.json({
     success: true,
     data: {
-      nitFacturador: process.env.NIT_FACTURADOR || '900000000',
-      codPrestador: process.env.COD_PRESTADOR || '500000000001',
-      versionResolucion: '1036 de 2022',
+      nitFacturador: process.env.NIT_FACTURADOR || '2300101133',
+      codPrestador: process.env.COD_PRESTADOR || '230010113301',
+      nombrePrestador: 'Dayan Ivonne Villegas Gamboa',
+      versionResolucion: 'Resolución 2275 de 2023 (Sin Factura)',
       formatosFecha: ['AAAA-MM-DD HH:MM'],
       tiposUsuario: {
         '01': 'Cotizante',

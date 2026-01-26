@@ -5,114 +5,129 @@
 
 const ripsConfig = {
   // Información del prestador
+  // Información del prestador (Datos oficiales Habilitación DHSS0230433)
   prestador: {
-    nit: process.env.NIT_FACTURADOR || '901234567',
-    codPrestador: process.env.COD_PRESTADOR || '500000000002',
-    nombre: 'Centro de Estimulación Mamitas',
-    especialidad: 'Fisioterapia Perinatal'
+    nit: process.env.NIT_FACTURADOR || '2300101133', // Usando Código Prestador base como NIT (Confirmar si es CC diferente)
+    codPrestador: process.env.COD_PRESTADOR || '230010113301',
+    nombre: 'Dayan Ivonne Villegas Gamboa',
+    especialidad: 'Fisioterapia Perinatal',
+    codServicioREPS: '739' // 739: FISIOTERAPIA (Res. 3100/2019)
   },
 
-  // Códigos CUPS para fisioterapia perinatal
+  // Códigos CUPS actualizados (Res. 2706 de 2025)
   codigosCUPS: {
-    // Consultas
-    consultaGeneral: '890201', // Consulta de fisioterapia general
-    consultaPrenatal: '890201', // Consulta prenatal
-    consultaPostnatal: '890201', // Consulta postnatal
+    // === CONSULTAS Y VALORACIONES (890264 - 890384) ===
+    // Se usan estos códigos base para todas las valoraciones de ingreso
+    consultaFisiatriaPrimeraVez: '890264',
+    consultaFisiatriaControl: '890384',
+    juntaMedica: '890502',
+    
+    // Mapeo de claves antiguas a nuevos códigos oficiales
+    consultaGeneral: '890264',
+    consultaPrenatal: '890264',
+    consultaPostnatal: '890264',
+    valoracionInicial: '890264',      // Valoración Niños -> Consulta 1ra Vez
+    valoracionPisoPelvis: '890264',   // Valoración Adultos -> Consulta 1ra Vez
+    valoracionLactancia: '890264',    // Valoración Lactancia -> Consulta 1ra Vez
 
-    // Procedimientos - Fisioterapia
-    terapiaFisicaIndividual: '895100', // Terapia física individual
-    terapiaFisicaGrupal: '895101', // Terapia física grupal
-    preparacionParto: '894301', // Preparación para el parto
-    reeducacionPisoPelvis: '895201', // Reeducación del piso pélvico
-    masajeTerapeutico: '895301', // Masaje terapéutico
-    electroterapia: '895401', // Electroterapia
-    termoterapia: '895501', // Termoterapia
-    hidroterapia: '895601', // Hidroterapia
-    mecanoterapia: '895701', // Mecanoterapia
+    // === PROCEDIMIENTOS PEDIATRÍA (Neurodesarrollo/Estimulación) ===
+    toxinaBotulinica: '861411',
+    integracionSensorial: '933900', // Clases Grupales / Estimulación
+    evaluacionOsteomuscular: '930401',
+    pruebaCognitiva: '930102',
+    rxPanoramicaMInf: '873306',
+    tecnologiaRehabilitacion: '932400',
 
-    // Valoraciones específicas
-    valoracionInicial: '890101', // Valoración inicial
-    valoracionPisoPelvis: '890102', // Valoración piso pélvico
-    valoracionLactancia: '890103' // Valoración lactancia
+    // === PROCEDIMIENTOS OBSTETRICIA / PISO PÉLVICO ===
+    ecoPisoPelvico: '881411',
+    ecoPelvicaGinecologica: '881410',
+    terapiaFisicaSOD: '931000',
+    
+    // Rehabilitación Funcional (Sesiones Piso Pélvico / Perinatales)
+    rehabDeficienciaLeve: '938610',     // Sesión Estándar
+    rehabDeficienciaModerada: '938611',
+    rehabDeficienciaSevera: '938612',
+    rehabDeficienciaDefinitiva: '938660',
+
+    // Mapeo de procedimientos antiguos a nuevos
+    terapiaFisicaIndividual: '931000',
+    terapiaFisicaGrupal: '933900',      // Clases -> Integración Sensorial
+    preparacionParto: '890384',         // Educación -> Consulta Control (o Rehab)
+    reeducacionPisoPelvis: '938610',    // Sesiones -> Rehab Leve
+    masajeTerapeutico: '931000',
+    electroterapia: '931000',
+    termoterapia: '931000',
+    hidroterapia: '931000',
+    mecanoterapia: '931000'
   },
 
-  // Valores de servicios (en pesos colombianos)
+  // Valores de servicios (Referenciales)
   valoresServicios: {
     // Consultas
-    consultaGeneral: 50000,
-    consultaPrenatal: 55000,
-    consultaPostnatal: 55000,
-
+    consultaGeneral: 80000,
+    consultaPrenatal: 90000,
+    consultaPostnatal: 90000,
+    consultaFisiatriaPrimeraVez: 90000,
+    
     // Procedimientos
-    terapiaFisicaIndividual: 35000,
-    terapiaFisicaGrupal: 25000,
-    preparacionParto: 45000,
-    reeducacionPisoPelvis: 40000,
-    masajeTerapeutico: 30000,
-    electroterapia: 25000,
-    termoterapia: 20000,
-    hidroterapia: 35000,
-    mecanoterapia: 30000,
+    terapiaFisicaIndividual: 45000,
+    terapiaFisicaGrupal: 35000,
+    preparacionParto: 50000,
+    reeducacionPisoPelvis: 50000,
+    
+    // Nuevos
+    integracionSensorial: 45000,
+    rehabDeficienciaLeve: 50000,
+    ecoPisoPelvico: 120000,
 
     // Valoraciones
-    valoracionInicial: 60000,
-    valoracionPisoPelvis: 65000,
-    valoracionLactancia: 55000
+    valoracionInicial: 90000,
+    valoracionPisoPelvis: 100000,
+    valoracionLactancia: 90000
   },
 
   // Mapeo de especialidades
   especialidades: {
     'Fisioterapia General': '01',
     'Fisioterapia Pediátrica': '02',
-    'Fisioterapia Obstétrica': '03',
-    'Fisioterapia Deportiva': '04',
-    'Fisioterapia Neurológica': '05'
+    'Fisioterapia Obstétrica': '03'
   },
-
-  // Finalidades según tipo de servicio
+  
+  // Finalidades (Actualizadas)
   finalidades: {
     // Consultas
-    consultaGeneral: '11', // Valoración integral para promoción y mantenimiento
-    consultaPrenatal: '05', // Atención prenatal
-    consultaPostnatal: '05', // Atención del parto y puerperio
-    consultaLactancia: '06', // Atención preconcepcional
+    consultaGeneral: '11',  // Val. Integral
+    consultaPrenatal: '05', // Prenatal (Si aplica) o 11
+    consultaPostnatal: '05',
+    consultaLactancia: '06', // Preconcepcional o 11
+    
+    // Mapeos
+    '890264': '11',
+    '890384': '11',
 
-    // Procedimientos
-    terapiaFisica: '44', // Rehabilitación
-    preparacionParto: '05', // Atención del parto y puerperio
-    pisoPelvis: '44', // Rehabilitación
-    masaje: '44', // Rehabilitación
-    electroterapia: '44', // Rehabilitación
-    termoterapia: '44', // Rehabilitación
-    hidroterapia: '44', // Rehabilitación
-    mecanoterapia: '44' // Rehabilitación
+    // Procedimientos (Rehabilitación = 44)
+    terapiaFisica: '44',
+    preparacionParto: '05',
+    pisoPelvis: '44',
+    rehabFuncional: '44',
+    
+    // Mapeos Nuevos
+    '933900': '44',
+    '938610': '44',
+    '881411': '44'
   },
 
-  // Códigos CIE-10 para fisioterapia perinatal
+  // Códigos CIE-10 (Mantener los existentes más comunes)
   diagnosticosCIE: {
-    // Fisioterapia general
-    fisioterapiaGeneral: 'Z51.4', // Fisioterapia
-
-    // Embarazo y parto
-    embarazo: 'Z34.9', // Embarazo no especificado
-    parto: 'Z39.2', // Atención postnatal
-    puerperio: 'Z39.2', // Atención postnatal
-
-    // Piso pélvico
-    incontinenciaUrinaria: 'N39.3', // Incontinencia urinaria
-    prolapsoGenital: 'N81.9', // Prolapso genital femenino
-
-    // Lactancia
-    problemasLactancia: 'Z39.1', // Atención y consejo sobre lactancia
-
-    // Pediatría
-    desarrolloPsicomotor: 'R62.0', // Retraso del desarrollo
-    parálisisCerebral: 'G80.9', // Parálisis cerebral infantil
-
-    // Promoción y prevención
-    promocionSalud: 'Z00.0', // Examen médico general
-    controlPrenatal: 'Z34.9', // Embarazo
-    controlPostnatal: 'Z39.2' // Atención postnatal
+    fisioterapiaGeneral: 'Z51.4',
+    embarazo: 'Z34.9',
+    parto: 'Z39.2',
+    incontinenciaUrinaria: 'N39.3',
+    prolapsoGenital: 'N81.9',
+    problemasLactancia: 'Z39.1',
+    desarrolloPsicomotor: 'R62.0',
+    paralisisCerebral: 'G80.9',
+    promocionSalud: 'Z00.0'
   },
 
   // Tipos de pago moderador
