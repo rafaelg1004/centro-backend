@@ -350,7 +350,7 @@ router.post("/enable-2fa", verificarToken(['administracion']), async (req, res) 
     });
 
     usuario.twoFactorSecret = secret.base32;
-    usuario.twoFactorEnabled = false; // Se habilita después de verificar
+    usuario.twoFactorEnabled = userId ? true : false; // Si es admin habilitando para otro, activar inmediatamente
     await usuario.save();
 
     // Generar QR code
@@ -566,7 +566,7 @@ router.get("/users", verificarToken(['administracion']), async (req, res) => {
     const usuarios = await Usuario.find({}, '-passwordHash -twoFactorSecret');
     res.json(usuarios);
   } catch (error) {
-    console.error("Error obteniendo usuarios:", error);
+    console.error("Error obteniendo usuarios :", error);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
@@ -617,6 +617,27 @@ router.post("/disable-2fa/:id", verificarToken(['administracion']), async (req, 
     res.json({ mensaje: "Autenticación de dos factores deshabilitada" });
   } catch (error) {
     console.error("Error deshabilitando 2FA:", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para cambiar contraseña de un usuario
+router.post("/change-password/:id", verificarToken(['administracion']), async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+  }
+  try {
+    const usuario = await Usuario.findById(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    usuario.passwordHash = passwordHash;
+    await usuario.save();
+    res.json({ mensaje: "Contraseña cambiada correctamente" });
+  } catch (error) {
+    console.error("Error cambiando contraseña:", error);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });

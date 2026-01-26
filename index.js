@@ -32,10 +32,7 @@ const Paciente = require('./models/Paciente');
 const PacienteAdulto = require('./models/PacienteAdulto');
 
 // Conexión a MongoDB Atlas
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI)
 .then(() => {
   console.log('✅ Conectado a MongoDB Atlas');
   // Limpiar cache de modelos si hay conflictos de esquema
@@ -45,7 +42,6 @@ mongoose.connect(process.env.MONGODB_URI, {
   ).catch(err => console.log('Info: No hay campos rutinaDiaria problemáticos'));
 })
 .catch(err => console.error('❌ Error al conectar a MongoDB Atlas:', err));
-console.log('MONGODB_URI:', process.env.MONGODB_URI);
 
 // Rutas
 app.use("/api", require("./routes/exportarWord"));
