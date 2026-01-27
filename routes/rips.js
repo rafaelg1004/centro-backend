@@ -175,13 +175,13 @@ router.post('/generate', authenticate, async (req, res) => {
           paciente: {
             nombres: paciente.nombres || '',
             apellidos: paciente.apellidos || '',
-            tipoDocumento: paciente.tipoDocumento || 'TI',
+            tipoDocumento: paciente.tipoDocumento || 'RC',
             numeroDocumento: paciente.numeroDocumento || paciente.registroCivil || '',
             fechaNacimiento: paciente.fechaNacimiento,
             genero: paciente.genero || 'Masculino',
             regimenAfiliacion: paciente.regimenAfiliacion || 'No asegurado',
             codPaisResidencia: '170',
-            codMunicipioResidencia: null,
+            codMunicipioResidencia: '23001',
             codZonaTerritorialResidencia: '01'
           },
           valoracionesIngreso: valoracionesIngreso.map(v => ({
@@ -211,7 +211,7 @@ router.post('/generate', authenticate, async (req, res) => {
             genero: paciente.genero || paciente.sexo || 'Femenino',
             regimenAfiliacion: paciente.regimenAfiliacion || 'No asegurado',
             codPaisResidencia: '170',
-            codMunicipioResidencia: null,
+            codMunicipioResidencia: '23001',
             codZonaTerritorialResidencia: '01'
           },
           valoracionesIngreso: [],

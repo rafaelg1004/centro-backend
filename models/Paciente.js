@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const pacienteSchema = new mongoose.Schema({
   nombres: { type: String, required: true },
+  tipoDocumento: String, // RC, TI, MS, etc.
   registroCivil: String,
   genero: String,
   lugarNacimiento: String,

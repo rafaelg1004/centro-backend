@@ -58,7 +58,9 @@ app.use('/api/valoracion-ingreso-adultos-lactancia', require('./routes/valoracio
 app.use('/api/consentimiento-perinatal', require('./routes/consentimientoPerinatal'));
 app.use('/api/valoracion-piso-pelvico', require('./routes/valoracionPisoPelvico'));
 app.use('/api', require('./routes/upload'));
+app.use('/api/valoraciones/reporte', require('./routes/exportarReporte'));
 app.use('/api/rips', require('./routes/rips'));
+app.use('/api/rda', require('./routes/rda'));
 app.use('/api/cups', require('./routes/cups'));
 
 // Endpoint para eliminar firmas de S3

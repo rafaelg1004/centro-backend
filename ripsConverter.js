@@ -202,7 +202,7 @@ class RIPSConverter {
         fechaNacimiento: this.formatFechaRIPS(paciente.fechaNacimiento),
         codSexo: codSexo,
         codPaisResidencia: paciente.codPaisResidencia || '170', // Colombia por defecto
-        codMunicipioResidencia: paciente.codMunicipioResidencia || null,
+        codMunicipioResidencia: paciente.codMunicipioResidencia || '23001', // Montería por defecto
         codZonaTerritorialResidencia: paciente.codZonaTerritorialResidencia || '01', // Urbana por defecto
         incapacidad: '02', // No aplica incapacidad por defecto
         consecutivo: pacienteData.consecutivo || 1
