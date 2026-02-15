@@ -100,10 +100,14 @@ router.post("/:id/firma-nino", async (req, res) => {
   }
 });
 
-// Obtener todas las clases (con filtros opcionales)
+// Obtener todas las clases (con filtros opcionales y paginación)
 router.get("/", async (req, res) => {
   try {
-    const { fechaInicio, fechaFin } = req.query;
+    const { fechaInicio, fechaFin, busqueda } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     let query = {};
 
     // Filtros de fecha
@@ -113,9 +117,26 @@ router.get("/", async (req, res) => {
       if (fechaFin) query.fecha.$lte = fechaFin;
     }
 
-    const clases = await Clase.find(query).populate("ninos.nino");
-    res.json(clases);
+    // Filtro de búsqueda por nombre si se proporciona (opcional, para hacerlo en el servidor)
+    if (busqueda) {
+      query.nombre = { $regex: busqueda, $options: "i" };
+    }
+
+    const total = await Clase.countDocuments(query);
+    const clases = await Clase.find(query)
+      .populate("ninos.nino")
+      .sort({ fecha: -1, _id: -1 }) // Mostrar las más recientes primero
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      data: clases,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (e) {
+    console.error("Error al obtener clases:", e);
     res.status(500).json({ error: e.message });
   }
 });

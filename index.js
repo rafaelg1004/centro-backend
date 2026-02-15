@@ -62,6 +62,7 @@ app.use('/api/valoraciones/reporte', require('./routes/exportarReporte'));
 app.use('/api/rips', require('./routes/rips'));
 app.use('/api/rda', require('./routes/rda'));
 app.use('/api/cups', require('./routes/cups'));
+app.use('/api/sesiones-mensuales', require('./routes/sesionesMensuales'));
 
 // Endpoint para eliminar firmas de S3
 const { eliminarImagenDeS3 } = require('./utils/s3Utils');
