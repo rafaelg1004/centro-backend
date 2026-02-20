@@ -124,8 +124,9 @@ router.get("/", async (req, res) => {
 
     const total = await Clase.countDocuments(query);
     const clases = await Clase.find(query)
-      .populate("ninos.nino")
-      .sort({ fecha: -1, _id: -1 }) // Mostrar las más recientes primero
+      .populate("ninos.nino", "nombres registroCivil genero edad") // Solo campos básicos del niño
+      .select("-ninos.firma") // Excluir firmas en el listado masivo
+      .sort({ fecha: -1, _id: -1 })
       .skip(skip)
       .limit(limit);
 

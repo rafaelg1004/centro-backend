@@ -36,24 +36,24 @@ const logAccesoValoracionMiddleware = (accion) => {
 const validarImagenes = (req, res, next) => {
   const data = req.body;
   const camposImagen = [
-    'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente', 'firmaFisioterapeuta', 
+    'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente', 'firmaFisioterapeuta',
     'firmaAutorizacion', 'consentimiento_firmaAcudiente', 'consentimiento_firmaFisio'
   ];
-  
+
   console.log('Validando imágenes en los datos recibidos...');
-  
+
   for (const campo of camposImagen) {
     if (data[campo] && data[campo].toString().startsWith('data:image')) {
       console.error(`Error: Se está intentando guardar imagen base64 en el campo ${campo}`);
       console.error(`Contenido del campo (primeros 50 caracteres): ${data[campo].substring(0, 50)}...`);
-      return res.status(400).json({ 
-        error: `El campo ${campo} contiene datos base64. Las imágenes deben subirse a S3 primero.` 
+      return res.status(400).json({
+        error: `El campo ${campo} contiene datos base64. Las imágenes deben subirse a S3 primero.`
       });
     } else if (data[campo]) {
       console.log(`Campo ${campo} válido: ${data[campo].substring(0, 50)}...`);
     }
   }
-  
+
   console.log('Todas las imágenes son válidas (URLs de S3)');
   next();
 };
@@ -69,7 +69,7 @@ router.post('/', validarImagenes, async (req, res) => {
       motivoDeConsulta: req.body.motivoDeConsulta
     });
     console.log('rutinaDiaria recibido:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
-    
+
     // Asegurar que todos los campos de texto sean strings
     const camposTexto = [
       'rutinaDiaria', 'motivoDeConsulta', 'descripcionSueno', 'motivoComida',
@@ -78,7 +78,7 @@ router.post('/', validarImagenes, async (req, res) => {
       'permaneceCon', 'prefiereA', 'relacionHermanos', 'emociones', 'juegaCon',
       'juegosPreferidos', 'relacionDesconocidos'
     ];
-    
+
     // Limpiar y validar cada campo
     camposTexto.forEach(campo => {
       if (req.body[campo] !== undefined) {
@@ -92,20 +92,20 @@ router.post('/', validarImagenes, async (req, res) => {
           console.log(`⚠️ Campo ${campo} no es string, convirtiendo:`, typeof req.body[campo], req.body[campo]);
           req.body[campo] = String(req.body[campo]);
         }
-        
+
         // Asegurar que strings vacíos queden como strings vacíos
         if (req.body[campo] === 'undefined' || req.body[campo] === 'null') {
           req.body[campo] = '';
         }
       }
     });
-    
+
     console.log('rutinaDiaria después de limpieza:', typeof req.body.rutinaDiaria, req.body.rutinaDiaria);
-    
+
     // Verificar si ya existe una valoración para este paciente
     if (req.body.paciente) {
       console.log('🔍 Verificando si ya existe valoración para paciente:', req.body.paciente);
-      
+
       // Validar que el ID del paciente sea válido
       if (!req.body.paciente.match(/^[0-9a-fA-F]{24}$/)) {
         console.log('❌ ID de paciente inválido:', req.body.paciente);
@@ -114,7 +114,7 @@ router.post('/', validarImagenes, async (req, res) => {
           mensaje: 'El ID del paciente no es válido'
         });
       }
-      
+
       // Verificar que el paciente existe en la base de datos
       const Paciente = require('../models/Paciente');
       const pacienteExiste = await Paciente.findById(req.body.paciente);
@@ -125,13 +125,13 @@ router.post('/', validarImagenes, async (req, res) => {
           mensaje: 'El paciente no existe en la base de datos'
         });
       }
-      
+
       console.log('✅ Paciente encontrado:', pacienteExiste.nombres);
-      
+
       // Buscar valoración existente
       const valoracionExistente = await ValoracionIngreso.findOne({ paciente: req.body.paciente });
       console.log('🔍 Resultado de búsqueda de valoración:', valoracionExistente ? `Encontrada: ${valoracionExistente._id}` : 'No encontrada');
-      
+
       if (valoracionExistente) {
         console.log('⚠️ Ya existe una valoración para este paciente:', valoracionExistente._id);
         console.log('⚠️ Detalles de la valoración existente:', {
@@ -140,7 +140,7 @@ router.post('/', validarImagenes, async (req, res) => {
           motivoDeConsulta: valoracionExistente.motivoDeConsulta,
           paciente: valoracionExistente.paciente
         });
-        
+
         return res.status(409).json({
           error: 'VALORACION_DUPLICADA',
           mensaje: 'Este paciente ya tiene una valoración de ingreso. Puede editarla si lo desea.',
@@ -161,7 +161,7 @@ router.post('/', validarImagenes, async (req, res) => {
         mensaje: 'El campo paciente es obligatorio'
       });
     }
-    
+
     const nuevaValoracion = new ValoracionIngreso(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
     res.status(201).json(valoracionGuardada);
@@ -178,7 +178,7 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
     const paginaNum = parseInt(pagina);
     const limiteNum = parseInt(limite);
     const skip = (paginaNum - 1) * limiteNum;
-    
+
     let query = {};
 
     console.log('🔍 Búsqueda de valoraciones con parámetros:', { busqueda, fechaInicio, fechaFin, pagina: paginaNum, limite: limiteNum });
@@ -188,12 +188,12 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
     if (busqueda) {
       // Crear regex que ignore acentos y caracteres especiales
       busquedaRegex = busqueda.replace(/[áäâà]/gi, '[áäâà]')
-                              .replace(/[éëêè]/gi, '[éëêè]')
-                              .replace(/[íïîì]/gi, '[íïîì]')
-                              .replace(/[óöôò]/gi, '[óöôò]')
-                              .replace(/[úüûù]/gi, '[úüûù]')
-                              .replace(/[ñ]/gi, '[ñ]');
-      
+        .replace(/[éëêè]/gi, '[éëêè]')
+        .replace(/[íïîì]/gi, '[íïîì]')
+        .replace(/[óöôò]/gi, '[óöôò]')
+        .replace(/[úüûù]/gi, '[úüûù]')
+        .replace(/[ñ]/gi, '[ñ]');
+
       // Primero buscar pacientes que coincidan
       const Paciente = require('../models/Paciente');
       const pacientesCoincidentes = await Paciente.find({
@@ -203,14 +203,14 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
           { registroCivil: { $regex: busquedaRegex, $options: 'i' } }
         ]
       }).select('_id');
-      
+
       const idsPacientes = pacientesCoincidentes.map(p => p._id);
       console.log('🔍 Pacientes encontrados:', idsPacientes.length);
       console.log('🔍 IDs de pacientes:', idsPacientes);
-      
+
       // Buscar valoraciones que pertenezcan a esos pacientes
       query.paciente = { $in: idsPacientes };
-      
+
       console.log('🔍 Query de búsqueda:', JSON.stringify(query, null, 2));
       console.log('🔍 Regex generado:', busquedaRegex);
     }
@@ -226,65 +226,67 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
 
     // Obtener TODAS las valoraciones para ordenamiento global
     let todasLasValoraciones = await ValoracionIngreso.find(query)
-      .populate('paciente', 'nombres apellidos registroCivil nombreMadre genero lugarNacimiento fechaNacimiento edad peso talla direccion telefono celular pediatra aseguradora nombrePadre edadPadre ocupacionPadre documentoRepresentante');
-    
+      .populate('paciente', 'nombres apellidos registroCivil genero edad aseguradora')
+      .select('-firmaProfesional -firmaRepresentante -firmaAcudiente -firmaFisioterapeuta -firmaAutorizacion');
+    // Excluir firmas en el listado
+
     // Ordenar alfabéticamente TODAS las valoraciones (ordenamiento global)
     todasLasValoraciones.sort((a, b) => {
       const nombreA = (a.paciente?.nombres || '').toLowerCase();
       const nombreB = (b.paciente?.nombres || '').toLowerCase();
       const apellidoA = (a.paciente?.apellidos || '').toLowerCase();
       const apellidoB = (b.paciente?.apellidos || '').toLowerCase();
-      
+
       // Primero comparar nombres
       if (nombreA !== nombreB) {
         return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       }
-      
+
       // Si los nombres son iguales, comparar apellidos
       return apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
     });
-    
+
     // Obtener total de documentos para paginación
     const total = todasLasValoraciones.length;
-    
+
     // Aplicar paginación DESPUÉS del ordenamiento global
     const valoraciones = todasLasValoraciones.slice(skip, skip + limiteNum);
-    
+
     console.log('📋 Ordenamiento alfabético GLOBAL aplicado. Primeras valoraciones ordenadas:');
     valoraciones.slice(0, 5).forEach((v, idx) => {
       console.log(`  ${idx + 1}. ${v.paciente?.nombres || 'Sin nombre'} ${v.paciente?.apellidos || ''}`);
     });
-    
+
     console.log(`📋 Total de valoraciones ordenadas: ${total}`);
     console.log(`📋 Página ${paginaNum}: mostrando del índice ${skip} al ${skip + valoraciones.length - 1}`);
-    
-          console.log(`📋 Encontradas ${valoraciones.length} valoraciones de ${total} totales`);
-      console.log('📋 Primeras valoraciones:', valoraciones.slice(0, 3).map(v => ({
-        id: v._id,
-        paciente: v.paciente ? {
-          nombres: v.paciente.nombres,
-          apellidos: v.paciente.apellidos,
-          registroCivil: v.paciente.registroCivil,
-          nombreMadre: v.paciente.nombreMadre
-        } : 'NO POBLADO',
-        nombres: v.nombres,
-        registroCivil: v.registroCivil
-      })));
-      
-      // Debug adicional para búsquedas
-      if (busqueda) {
-        console.log('🔍 Búsqueda realizada:', busqueda);
-        console.log('🔍 Regex usado:', busquedaRegex);
-        console.log('🔍 Query completo:', JSON.stringify(query, null, 2));
-        console.log('🔍 Valoraciones que coinciden con la búsqueda:');
-        valoraciones.forEach((v, idx) => {
-          const nombrePaciente = v.paciente?.nombres || 'Sin nombre';
-          const apellidoPaciente = v.paciente?.apellidos || '';
-          const docPaciente = v.paciente?.registroCivil || 'Sin documento';
-          console.log(`  ${idx + 1}. Nombre: "${nombrePaciente} ${apellidoPaciente}".trim() | Doc: "${docPaciente}" | ID Paciente: ${v.paciente?._id || 'NO POBLADO'}`);
-        });
-      }
-    
+
+    console.log(`📋 Encontradas ${valoraciones.length} valoraciones de ${total} totales`);
+    console.log('📋 Primeras valoraciones:', valoraciones.slice(0, 3).map(v => ({
+      id: v._id,
+      paciente: v.paciente ? {
+        nombres: v.paciente.nombres,
+        apellidos: v.paciente.apellidos,
+        registroCivil: v.paciente.registroCivil,
+        nombreMadre: v.paciente.nombreMadre
+      } : 'NO POBLADO',
+      nombres: v.nombres,
+      registroCivil: v.registroCivil
+    })));
+
+    // Debug adicional para búsquedas
+    if (busqueda) {
+      console.log('🔍 Búsqueda realizada:', busqueda);
+      console.log('🔍 Regex usado:', busquedaRegex);
+      console.log('🔍 Query completo:', JSON.stringify(query, null, 2));
+      console.log('🔍 Valoraciones que coinciden con la búsqueda:');
+      valoraciones.forEach((v, idx) => {
+        const nombrePaciente = v.paciente?.nombres || 'Sin nombre';
+        const apellidoPaciente = v.paciente?.apellidos || '';
+        const docPaciente = v.paciente?.registroCivil || 'Sin documento';
+        console.log(`  ${idx + 1}. Nombre: "${nombrePaciente} ${apellidoPaciente}".trim() | Doc: "${docPaciente}" | ID Paciente: ${v.paciente?._id || 'NO POBLADO'}`);
+      });
+    }
+
     res.json({
       valoraciones,
       paginacion: {
@@ -306,7 +308,7 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
 router.get('/verificar/:pacienteId', async (req, res) => {
   try {
     const valoracion = await ValoracionIngreso.findOne({ paciente: req.params.pacienteId });
-    
+
     if (valoracion) {
       res.json({
         tieneValoracion: true,
@@ -344,29 +346,29 @@ router.get('/adulto/:pacienteId', async (req, res) => {
   try {
     console.log('=== BUSCANDO VALORACIONES ADULTO ===');
     console.log('Paciente ID:', req.params.pacienteId);
-    
+
     const ValoracionLactancia = require('../models/ValoracionIngresoAdultosLactancia');
     const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
     const ConsentimientoPerinatal = require('../models/ConsentimientoPerinatal');
-    
+
     // Buscar lactancia
     console.log('Buscando valoraciones de lactancia...');
     const lactancia = await ValoracionLactancia.find({ paciente: req.params.pacienteId }).populate('paciente');
     console.log('Lactancia encontradas:', lactancia.length);
-    
+
     // Buscar piso pélvico
     console.log('Buscando valoraciones de piso pélvico...');
     const pisoPelvico = await ValoracionPisoPelvico.find({ paciente: req.params.pacienteId }).populate('paciente');
     console.log('Piso pélvico encontradas:', pisoPelvico.length);
-    
+
     // Buscar perinatal
     console.log('Buscando consentimientos perinatales...');
     const perinatal = await ConsentimientoPerinatal.find({ paciente: req.params.pacienteId }).populate('paciente');
     console.log('Perinatales encontrados:', perinatal.length);
-    
+
     // Combinar y agregar tipo
     const todasLasValoraciones = [];
-    
+
     lactancia.forEach(v => {
       todasLasValoraciones.push({
         ...v.toObject(),
@@ -374,7 +376,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
         ruta: `/valoracion-ingreso-adultos-lactancia/${v._id}`
       });
     });
-    
+
     pisoPelvico.forEach(v => {
       todasLasValoraciones.push({
         ...v.toObject(),
@@ -382,7 +384,7 @@ router.get('/adulto/:pacienteId', async (req, res) => {
         ruta: `/valoraciones-piso-pelvico/${v._id}`
       });
     });
-    
+
     perinatal.forEach(v => {
       todasLasValoraciones.push({
         ...v.toObject(),
@@ -390,10 +392,10 @@ router.get('/adulto/:pacienteId', async (req, res) => {
         ruta: `/consentimientos-perinatales/${v._id}`
       });
     });
-    
+
     console.log('Total valoraciones combinadas:', todasLasValoraciones.length);
     console.log('Valoraciones:', todasLasValoraciones.map(v => ({ id: v._id, tipo: v.tipo, fecha: v.fecha || v.createdAt })));
-    
+
     res.json(todasLasValoraciones);
   } catch (error) {
     console.error('Error al obtener valoraciones del paciente adulto:', error);
@@ -424,8 +426,8 @@ router.delete('/:id', logAccesoValoracionMiddleware('ELIMINAR_VALORACION'), asyn
 
     // Lista de campos que pueden contener imágenes
     const camposImagen = [
-      'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente', 
-      'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimiento_firmaAcudiente', 
+      'firmaProfesional', 'firmaRepresentante', 'firmaAcudiente',
+      'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimiento_firmaAcudiente',
       'consentimiento_firmaFisio'
     ];
 
@@ -434,8 +436,8 @@ router.delete('/:id', logAccesoValoracionMiddleware('ELIMINAR_VALORACION'), asyn
 
     // Eliminar la valoración de la base de datos
     const deleted = await ValoracionIngreso.findByIdAndDelete(req.params.id);
-    
-    res.json({ 
+
+    res.json({
       mensaje: "Valoración eliminada correctamente",
       imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
       totalImagenes: resultadosEliminacion.length
@@ -460,24 +462,24 @@ router.put('/:id', logAccesoValoracionMiddleware('ACTUALIZAR_VALORACION'), valid
     // Lista de campos que pueden contener imágenes
     const camposImagen = [
       'firmaRepresentante',
-      'firmaProfesional', 
+      'firmaProfesional',
       'firmaAutorizacion'
     ];
 
     // Importar función de eliminación
     const { eliminarImagenDeS3 } = require('../utils/s3Utils');
-    
+
     // Detectar imágenes que han cambiado y eliminar las anteriores
     let imagenesEliminadas = 0;
     for (const campo of camposImagen) {
       const imagenAnterior = valoracionActual[campo];
       const imagenNueva = req.body[campo];
-      
+
       // Si había una imagen anterior y ahora es diferente (o se eliminó)
-      if (imagenAnterior && 
-          imagenAnterior.includes('amazonaws.com') && 
-          imagenAnterior !== imagenNueva) {
-        
+      if (imagenAnterior &&
+        imagenAnterior.includes('amazonaws.com') &&
+        imagenAnterior !== imagenNueva) {
+
         console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
         const resultado = await eliminarImagenDeS3(imagenAnterior);
         if (resultado.success) {
@@ -497,9 +499,9 @@ router.put('/:id', logAccesoValoracionMiddleware('ACTUALIZAR_VALORACION'), valid
     );
 
     console.log(`✓ Valoración ingreso actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
-    
-    res.json({ 
-      mensaje: 'Valoración actualizada correctamente', 
+
+    res.json({
+      mensaje: 'Valoración actualizada correctamente',
       valoracion: valoracionActualizada,
       imagenesAnterioresEliminadas: imagenesEliminadas
     });

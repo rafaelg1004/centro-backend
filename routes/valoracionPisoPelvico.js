@@ -6,12 +6,12 @@ const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 // Middleware para bloquear imágenes base64
 const bloquearImagenesBase64 = (req, res, next) => {
   console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
-  
+
   const data = req.body;
   const camposImagen = [
     'firmaPaciente', 'firmaFisioterapeuta', 'firmaAutorizacion', 'consentimientoFirma'
   ];
-  
+
   for (const campo of camposImagen) {
     if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
       console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
@@ -21,7 +21,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
       });
     }
   }
-  
+
   console.log('✓ Verificación de imágenes base64 completada');
   next();
 };
@@ -39,7 +39,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
 
     // Validar que se envíe el ID del paciente
     if (!req.body.paciente) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         mensaje: 'El campo paciente es obligatorio',
         error: 'PACIENTE_REQUERIDO'
       });
@@ -47,7 +47,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
 
     // Validar que el ID del paciente sea válido
     if (!req.body.paciente.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         mensaje: 'El ID del paciente no es válido',
         error: 'PACIENTE_ID_INVALIDO'
       });
@@ -57,7 +57,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
     const PacienteAdulto = require('../models/PacienteAdulto');
     const pacienteExiste = await PacienteAdulto.findById(req.body.paciente);
     if (!pacienteExiste) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         mensaje: 'El paciente adulto no existe',
         error: 'PACIENTE_NO_ENCONTRADO'
       });
@@ -65,7 +65,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
 
     // Verificar si ya existe una valoración para este paciente
     const valoracionExistente = await Valoracion.findOne({ paciente: req.body.paciente });
-    
+
     if (valoracionExistente) {
       console.log('⚠️ Ya existe una valoración de piso pélvico para este paciente:', valoracionExistente._id);
       return res.status(409).json({
@@ -79,10 +79,10 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
         sugerencia: 'Use la opción de editar para modificar la valoración existente'
       });
     }
-    
+
     const nuevaValoracion = new Valoracion(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
-    
+
     console.log('✓ Valoración piso pélvico guardada exitosamente:', valoracionGuardada._id);
     res.status(201).json(valoracionGuardada);
   } catch (error) {
@@ -95,12 +95,12 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     console.log('Obteniendo valoraciones piso pélvico con filtros...');
-    
+
     const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 15 } = req.query;
     const paginaNum = parseInt(pagina);
     const limiteNum = parseInt(limite);
     const skip = (paginaNum - 1) * limiteNum;
-    
+
     let query = {};
 
     // Filtros de fecha
@@ -114,15 +114,15 @@ router.get('/', async (req, res) => {
     let busquedaRegex = '';
     if (busqueda) {
       const PacienteAdulto = require('../models/PacienteAdulto');
-      
+
       // Crear regex que ignore acentos y caracteres especiales
       busquedaRegex = busqueda.replace(/[áäâà]/gi, '[áäâà]')
-                              .replace(/[éëêè]/gi, '[éëêè]')
-                              .replace(/[íïîì]/gi, '[íïîì]')
-                              .replace(/[óöôò]/gi, '[óöôò]')
-                              .replace(/[úüûù]/gi, '[úüûù]')
-                              .replace(/[ñ]/gi, '[ñ]');
-      
+        .replace(/[éëêè]/gi, '[éëêè]')
+        .replace(/[íïîì]/gi, '[íïîì]')
+        .replace(/[óöôò]/gi, '[óöôò]')
+        .replace(/[úüûù]/gi, '[úüûù]')
+        .replace(/[ñ]/gi, '[ñ]');
+
       const pacientesCoincidentes = await PacienteAdulto.find({
         $or: [
           { nombres: { $regex: busquedaRegex, $options: "i" } },
@@ -130,17 +130,18 @@ router.get('/', async (req, res) => {
           { cedula: { $regex: busquedaRegex, $options: "i" } }
         ]
       }).select('_id');
-      
+
       const idsPacientes = pacientesCoincidentes.map(p => p._id);
       query.paciente = { $in: idsPacientes };
     }
 
     // Obtener total de documentos para paginación
     const total = await Valoracion.countDocuments(query);
-    
+
     // Obtener valoraciones con paginación
     const valoraciones = await Valoracion.find(query)
-      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .populate('paciente', 'nombres apellidos cedula genero edad aseguradora')
+      .select('-firmaPaciente -firmaFisioterapeuta -firmaAutorizacion -consentimientoFirma')
       .sort({
         'paciente.nombres': 1,
         'paciente.apellidos': 1,
@@ -148,7 +149,7 @@ router.get('/', async (req, res) => {
       })
       .skip(skip)
       .limit(limiteNum);
-    
+
     console.log(`✓ Encontradas ${valoraciones.length} valoraciones piso pélvico de ${total} totales`);
     res.json({
       valoraciones,
@@ -171,7 +172,7 @@ router.get('/', async (req, res) => {
 router.get('/verificar/:pacienteId', async (req, res) => {
   try {
     const valoracion = await Valoracion.findOne({ paciente: req.params.pacienteId });
-    
+
     if (valoracion) {
       res.json({
         tieneValoracion: true,
@@ -206,7 +207,7 @@ router.get('/buscar', async (req, res) => {
         .limit(50);
       return res.json(valoraciones);
     }
-    
+
     // Buscar pacientes que coincidan con la búsqueda
     const PacienteAdulto = require('../models/PacienteAdulto');
     const pacientesCoincidentes = await PacienteAdulto.find({
@@ -217,9 +218,9 @@ router.get('/buscar', async (req, res) => {
         { telefono: { $regex: q, $options: "i" } }
       ]
     }).select('_id');
-    
+
     const idsPacientes = pacientesCoincidentes.map(p => p._id);
-    
+
     // Buscar valoraciones que pertenezcan a esos pacientes
     const valoraciones = await Valoracion.find({
       $or: [
@@ -227,10 +228,10 @@ router.get('/buscar', async (req, res) => {
         { motivoConsulta: { $regex: q, $options: "i" } }
       ]
     })
-    .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
-    .sort({ createdAt: -1 })
-    .limit(20);
-    
+      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
     res.json(valoraciones);
   } catch (e) {
     console.error("Error en /buscar:", e);
@@ -242,10 +243,10 @@ router.get('/buscar', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     console.log('Buscando valoración piso pélvico:', req.params.id);
-    
+
     const valoracion = await Valoracion.findById(req.params.id)
       .populate('paciente', 'nombres cedula genero lugarNacimiento fechaNacimiento edad estadoCivil direccion telefono celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto');
-    
+
     if (!valoracion) {
       return res.status(404).json({ mensaje: 'Valoración no encontrada' });
     }
@@ -281,25 +282,25 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
     // Lista de campos que pueden contener imágenes
     const camposImagen = [
       'firmaPaciente',
-      'firmaFisioterapeuta', 
-      'firmaAutorizacion', 
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
       'consentimientoFirma'
     ];
 
     // Importar función de eliminación
     const { eliminarImagenDeS3 } = require('../utils/s3Utils');
-    
+
     // Detectar imágenes que han cambiado y eliminar las anteriores
     let imagenesEliminadas = 0;
     for (const campo of camposImagen) {
       const imagenAnterior = valoracionActual[campo];
       const imagenNueva = req.body[campo];
-      
+
       // Si había una imagen anterior y ahora es diferente (o se eliminó)
-      if (imagenAnterior && 
-          imagenAnterior.includes('amazonaws.com') && 
-          imagenAnterior !== imagenNueva) {
-        
+      if (imagenAnterior &&
+        imagenAnterior.includes('amazonaws.com') &&
+        imagenAnterior !== imagenNueva) {
+
         console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
         const resultado = await eliminarImagenDeS3(imagenAnterior);
         if (resultado.success) {
@@ -313,22 +314,22 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
 
     // Actualizar la valoración con los nuevos datos
     const valoracionActualizada = await Valoracion.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
+      req.params.id,
+      req.body,
       { runValidators: true, new: true }
     ).populate('paciente', 'nombres cedula genero lugarNacimiento fechaNacimiento edad estadoCivil direccion telefono celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto');
 
     console.log(`✓ Valoración piso pélvico actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
-    
-    res.json({ 
+
+    res.json({
       mensaje: 'Valoración actualizada exitosamente',
       valoracion: valoracionActualizada,
       imagenesAnterioresEliminadas: imagenesEliminadas
     });
   } catch (error) {
     console.error('Error al actualizar valoración:', error);
-    res.status(500).json({ 
-      mensaje: 'Error al actualizar valoración', 
+    res.status(500).json({
+      mensaje: 'Error al actualizar valoración',
       error: error.message,
       stack: error.stack
     });
@@ -340,13 +341,13 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`Intentando eliminar valoración piso pélvico con ID: ${id}`);
-    
+
     // Validar que el ID tenga el formato correcto de MongoDB ObjectId
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
       console.log('❌ ID inválido - no es un ObjectId válido');
       return res.status(400).json({ mensaje: "ID de valoración inválido" });
     }
-    
+
     // Primero obtener la valoración para acceder a las imágenes
     const valoracion = await Valoracion.findById(id);
     if (!valoracion) {
@@ -359,8 +360,8 @@ router.delete('/:id', async (req, res) => {
     // Lista de campos que pueden contener imágenes (ajustar según el modelo)
     const camposImagen = [
       'firmaPaciente',
-      'firmaFisioterapeuta', 
-      'firmaAutorizacion', 
+      'firmaFisioterapeuta',
+      'firmaAutorizacion',
       'consentimientoFirma'
     ];
 
@@ -369,9 +370,9 @@ router.delete('/:id', async (req, res) => {
 
     // Eliminar la valoración de la base de datos
     await Valoracion.findByIdAndDelete(id);
-    
+
     console.log(`✅ Valoración ${id} eliminada exitosamente`);
-    res.json({ 
+    res.json({
       mensaje: 'Valoración eliminada exitosamente',
       imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
       totalImagenes: resultadosEliminacion.length

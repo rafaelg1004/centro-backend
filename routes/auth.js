@@ -642,5 +642,6 @@ router.post("/change-password/:id", verificarToken(['administracion']), async (r
   }
 });
 
-// Exportar middleware para usar en otras rutas
+// Exportar router y middleware
+router.verificarToken = verificarToken;
 module.exports = router;

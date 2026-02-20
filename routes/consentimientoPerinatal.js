@@ -6,7 +6,7 @@ const { eliminarImagenesConsentimientoPerinatal } = require('../utils/s3Utils');
 // Middleware para bloquear imágenes base64
 const bloquearImagenesBase64 = (req, res, next) => {
   console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
-  
+
   const data = req.body;
   const camposImagen = [
     'firmaPaciente',
@@ -29,7 +29,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
     'firmaPacienteSesionIntensivo2',
     'firmaPacienteSesionIntensivo3'
   ];
-  
+
   // Verificar campos individuales
   for (const campo of camposImagen) {
     if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
@@ -40,7 +40,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
       });
     }
   }
-  
+
   // Verificar imágenes en arrays de sesiones
   if (data.sesiones && Array.isArray(data.sesiones)) {
     for (let i = 0; i < data.sesiones.length; i++) {
@@ -54,7 +54,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
       }
     }
   }
-  
+
   // Verificar imágenes en arrays de sesiones intensivo
   if (data.sesionesIntensivo && Array.isArray(data.sesionesIntensivo)) {
     for (let i = 0; i < data.sesionesIntensivo.length; i++) {
@@ -68,7 +68,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
       }
     }
   }
-  
+
   console.log('✓ Verificación de imágenes base64 completada');
   next();
 };
@@ -103,8 +103,10 @@ router.get("/", async (req, res) => {
       if (fechaFin) query.fecha.$lte = fechaFin;
     }
 
-    const consentimientos = await ConsentimientoPerinatal.find(query).populate("paciente", "nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto");
-    
+    const consentimientos = await ConsentimientoPerinatal.find(query)
+      .populate("paciente", "nombres apellidos cedula genero edad aseguradora")
+      .select("-firmaPaciente -firmaFisioterapeuta -firmaAutorizacion -firmaPacienteConsentimiento -firmaFisioterapeutaConsentimiento -firmaPacienteGeneral -firmaFisioterapeutaGeneral -firmaPacienteGeneralIntensivo -firmaFisioterapeutaGeneralIntensivo");
+
     // Filtro de búsqueda por nombre o cédula (aplicado después del populate)
     let consentimientosFiltrados = consentimientos;
     if (busqueda) {
@@ -114,10 +116,10 @@ router.get("/", async (req, res) => {
         const nombres = paciente.nombres || '';
         const cedula = paciente.cedula || '';
         return nombres.toLowerCase().includes(busqueda.toLowerCase()) ||
-               cedula.toLowerCase().includes(busqueda.toLowerCase());
+          cedula.toLowerCase().includes(busqueda.toLowerCase());
       });
     }
-    
+
     res.json(consentimientosFiltrados);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -217,20 +219,20 @@ router.put("/:id", bloquearImagenesBase64, async (req, res) => {
 
     // Importar función de eliminación
     const { eliminarImagenDeS3, eliminarImagenesConsentimientoPerinatal } = require('../utils/s3Utils');
-    
+
     // Detectar imágenes que han cambiado y eliminar las anteriores
     let imagenesEliminadas = 0;
-    
+
     // Primero verificar campos individuales
     for (const campo of camposImagen) {
       const imagenAnterior = consentimientoActual[campo];
       const imagenNueva = req.body[campo];
-      
+
       // Si había una imagen anterior y ahora es diferente (o se eliminó)
-      if (imagenAnterior && 
-          imagenAnterior.includes('amazonaws.com') && 
-          imagenAnterior !== imagenNueva) {
-        
+      if (imagenAnterior &&
+        imagenAnterior.includes('amazonaws.com') &&
+        imagenAnterior !== imagenNueva) {
+
         console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
         const resultado = await eliminarImagenDeS3(imagenAnterior);
         if (resultado.success) {
@@ -247,11 +249,11 @@ router.put("/:id", bloquearImagenesBase64, async (req, res) => {
       for (let i = 0; i < consentimientoActual.sesiones.length; i++) {
         const sesionAnterior = consentimientoActual.sesiones[i];
         const sesionNueva = req.body.sesiones && req.body.sesiones[i];
-        
-        if (sesionAnterior.firmaPaciente && 
-            sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
-            (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
-          
+
+        if (sesionAnterior.firmaPaciente &&
+          sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
+          (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
+
           console.log(`Eliminando firma anterior de sesión ${i + 1}: ${sesionAnterior.firmaPaciente}`);
           const resultado = await eliminarImagenDeS3(sesionAnterior.firmaPaciente);
           if (resultado.success) {
@@ -267,11 +269,11 @@ router.put("/:id", bloquearImagenesBase64, async (req, res) => {
       for (let i = 0; i < consentimientoActual.sesionesIntensivo.length; i++) {
         const sesionAnterior = consentimientoActual.sesionesIntensivo[i];
         const sesionNueva = req.body.sesionesIntensivo && req.body.sesionesIntensivo[i];
-        
-        if (sesionAnterior.firmaPaciente && 
-            sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
-            (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
-          
+
+        if (sesionAnterior.firmaPaciente &&
+          sesionAnterior.firmaPaciente.includes('amazonaws.com') &&
+          (!sesionNueva || sesionAnterior.firmaPaciente !== sesionNueva.firmaPaciente)) {
+
           console.log(`Eliminando firma anterior de sesión intensivo ${i + 1}: ${sesionAnterior.firmaPaciente}`);
           const resultado = await eliminarImagenDeS3(sesionAnterior.firmaPaciente);
           if (resultado.success) {
@@ -290,7 +292,7 @@ router.put("/:id", bloquearImagenesBase64, async (req, res) => {
     );
 
     console.log(`✓ Consentimiento perinatal actualizado. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
-    
+
     res.json({
       ...consentimientoActualizado.toObject(),
       imagenesAnterioresEliminadas: imagenesEliminadas
@@ -340,8 +342,8 @@ router.delete("/:id", async (req, res) => {
 
     // Eliminar el consentimiento de la base de datos
     await ConsentimientoPerinatal.findByIdAndDelete(req.params.id);
-    
-    res.json({ 
+
+    res.json({
       mensaje: 'Consentimiento eliminado exitosamente',
       imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
       totalImagenes: resultadosEliminacion.length

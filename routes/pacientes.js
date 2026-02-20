@@ -62,7 +62,7 @@ router.post("/", async (req, res) => {
     if (existe) {
       return res.status(400).json({ error: "El paciente ya existe" });
     }
-     const paciente = new Paciente(req.body);
+    const paciente = new Paciente(req.body);
     await paciente.save();
     res.json({ mensaje: "Paciente registrado correctamente" });
   } catch (error) {
@@ -72,7 +72,9 @@ router.post("/", async (req, res) => {
 });
 router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
   try {
-    const pacientes = await Paciente.find().sort({ nombres: 1 });
+    const pacientes = await Paciente.find()
+      .select('nombres registroCivil genero edad fechaNacimiento aseguradora')
+      .sort({ nombres: 1 });
     res.json(pacientes);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener pacientes" });

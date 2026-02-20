@@ -6,10 +6,10 @@ const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 // Middleware para bloquear imágenes base64
 const bloquearImagenesBase64 = (req, res, next) => {
   console.log('Verificando que no se envíen imágenes base64 a la base de datos...');
-  
+
   const data = req.body;
   const camposImagen = [
-    'firmaPaciente', 
+    'firmaPaciente',
     'firmaAutorizacion',
     'firmaPacienteSesion1',
     'firmaPacienteSesion2',
@@ -19,7 +19,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
     'firmaConsentimientoLactancia',
     'firmaProfesionalConsentimientoLactancia'
   ];
-  
+
   for (const campo of camposImagen) {
     if (data[campo] && typeof data[campo] === 'string' && data[campo].startsWith('data:image')) {
       console.error(`❌ Intento de guardar imagen base64 en campo ${campo}`);
@@ -29,7 +29,7 @@ const bloquearImagenesBase64 = (req, res, next) => {
       });
     }
   }
-  
+
   console.log('✓ Verificación de imágenes base64 completada');
   next();
 };
@@ -40,7 +40,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
     // Verificar si ya existe una valoración para este paciente
     if (req.body.paciente) {
       const valoracionExistente = await Valoracion.findOne({ paciente: req.body.paciente });
-      
+
       if (valoracionExistente) {
         console.log('⚠️ Ya existe una valoración de lactancia para este paciente:', valoracionExistente._id);
         return res.status(409).json({
@@ -55,7 +55,7 @@ router.post('/', bloquearImagenesBase64, async (req, res) => {
         });
       }
     }
-    
+
     const nuevaValoracion = new Valoracion(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
     res.status(201).json(valoracionGuardada);
@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
     const paginaNum = parseInt(pagina);
     const limiteNum = parseInt(limite);
     const skip = (paginaNum - 1) * limiteNum;
-    
+
     let query = {};
 
     // Filtro de búsqueda por nombre o cédula
@@ -80,12 +80,12 @@ router.get('/', async (req, res) => {
     if (busqueda) {
       // Crear regex que ignore acentos y caracteres especiales
       busquedaRegex = busqueda.replace(/[áäâà]/gi, '[áäâà]')
-                              .replace(/[éëêè]/gi, '[éëêè]')
-                              .replace(/[íïîì]/gi, '[íïîì]')
-                              .replace(/[óöôò]/gi, '[óöôò]')
-                              .replace(/[úüûù]/gi, '[úüûù]')
-                              .replace(/[ñ]/gi, '[ñ]');
-      
+        .replace(/[éëêè]/gi, '[éëêè]')
+        .replace(/[íïîì]/gi, '[íïîì]')
+        .replace(/[óöôò]/gi, '[óöôò]')
+        .replace(/[úüûù]/gi, '[úüûù]')
+        .replace(/[ñ]/gi, '[ñ]');
+
       query.$or = [
         { 'nombres': { $regex: busquedaRegex, $options: 'i' } },
         { 'cedula': { $regex: busquedaRegex, $options: 'i' } }
@@ -101,17 +101,18 @@ router.get('/', async (req, res) => {
 
     // Obtener total de documentos para paginación
     const total = await Valoracion.countDocuments(query);
-    
+
     // Obtener valoraciones con paginación
     const valoraciones = await Valoracion.find(query)
-      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .populate('paciente', 'nombres apellidos cedula genero edad aseguradora')
+      .select('-firmaPaciente -firmaAutorizacion -firmaPacienteSesion1 -firmaPacienteSesion2 -firmaFisioterapeutaPlanIntervencion -firmaFisioterapeutaPrenatal -firmaPacientePrenatalFinal -firmaConsentimientoLactancia -firmaProfesionalConsentimientoLactancia')
       .sort({
         nombres: 1,
         createdAt: -1
       })
       .skip(skip)
       .limit(limiteNum);
-    
+
     res.json({
       valoraciones,
       paginacion: {
@@ -131,7 +132,7 @@ router.get('/', async (req, res) => {
 router.get('/verificar/:pacienteId', async (req, res) => {
   try {
     const valoracion = await Valoracion.findOne({ paciente: req.params.pacienteId });
-    
+
     if (valoracion) {
       res.json({
         tieneValoracion: true,
@@ -167,8 +168,8 @@ router.get('/buscar', async (req, res) => {
         { cedula: { $regex: q, $options: "i" } }
       ]
     })
-    .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
-    .limit(20);
+      .populate('paciente', 'nombres apellidos cedula telefono fechaNacimiento edad genero lugarNacimiento estadoCivil direccion celular ocupacion nivelEducativo medicoTratante aseguradora acompanante telefonoAcompanante nombreBebe semanasGestacion fum fechaProbableParto')
+      .limit(20);
     res.json(valoraciones);
   } catch (e) {
     console.error("Error en /buscar:", e);
@@ -202,7 +203,7 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
     // Lista de campos que pueden contener imágenes
     const camposImagen = [
       'firmaPacientePrenatal',
-      'firmaPaciente', 
+      'firmaPaciente',
       'firmaFisioterapeuta',
       'firmaAutorizacion',
       'firmaPacienteSesion1',
@@ -216,18 +217,18 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
 
     // Importar función de eliminación
     const { eliminarImagenDeS3 } = require('../utils/s3Utils');
-    
+
     // Detectar imágenes que han cambiado y eliminar las anteriores
     let imagenesEliminadas = 0;
     for (const campo of camposImagen) {
       const imagenAnterior = valoracionActual[campo];
       const imagenNueva = req.body[campo];
-      
+
       // Si había una imagen anterior y ahora es diferente (o se eliminó)
-      if (imagenAnterior && 
-          imagenAnterior.includes('amazonaws.com') && 
-          imagenAnterior !== imagenNueva) {
-        
+      if (imagenAnterior &&
+        imagenAnterior.includes('amazonaws.com') &&
+        imagenAnterior !== imagenNueva) {
+
         console.log(`Eliminando imagen anterior del campo ${campo}: ${imagenAnterior}`);
         const resultado = await eliminarImagenDeS3(imagenAnterior);
         if (resultado.success) {
@@ -241,14 +242,14 @@ router.put('/:id', bloquearImagenesBase64, async (req, res) => {
 
     // Actualizar la valoración con los nuevos datos
     const valoracionActualizada = await Valoracion.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
+      req.params.id,
+      req.body,
       { new: true }
     );
 
     console.log(`✓ Valoración actualizada. Imágenes anteriores eliminadas: ${imagenesEliminadas}`);
-    
-    res.json({ 
+
+    res.json({
       mensaje: 'Valoración actualizada exitosamente',
       valoracion: valoracionActualizada,
       imagenesAnterioresEliminadas: imagenesEliminadas
@@ -271,7 +272,7 @@ router.delete('/:id', async (req, res) => {
 
     // Lista de campos que pueden contener imágenes en valoraciones de lactancia
     const camposImagen = [
-      'firmaPaciente', 
+      'firmaPaciente',
       'firmaAutorizacion',
       'firmaPacienteSesion1',
       'firmaPacienteSesion2',
@@ -287,8 +288,8 @@ router.delete('/:id', async (req, res) => {
 
     // Eliminar la valoración de la base de datos
     await Valoracion.findByIdAndDelete(req.params.id);
-    
-    res.json({ 
+
+    res.json({
       mensaje: 'Valoración eliminada exitosamente',
       imagenesEliminadas: resultadosEliminacion.filter(r => r.resultado.success).length,
       totalImagenes: resultadosEliminacion.length

@@ -59,20 +59,20 @@ const logAccesoAdultoMiddleware = (accion) => {
 router.post("/", async (req, res) => {
   try {
     console.log("📝 Datos recibidos para registro:", req.body);
-    
+
     const existe = await PacienteAdulto.findOne({ cedula: req.body.cedula });
     if (existe) {
       return res.status(400).json({ error: "El paciente adulto ya existe" });
     }
-    
+
     // Validar que el estadoEmbarazo sea válido
     if (req.body.estadoEmbarazo && !['gestacion', 'posparto'].includes(req.body.estadoEmbarazo)) {
       return res.status(400).json({ error: "Estado de embarazo inválido" });
     }
-    
+
     const paciente = new PacienteAdulto(req.body);
     await paciente.save();
-    
+
     console.log("✅ Paciente adulto registrado:", paciente._id);
     res.json({ mensaje: "Paciente adulto registrado correctamente" });
   } catch (error) {
@@ -84,7 +84,9 @@ router.post("/", async (req, res) => {
 // Obtener todos los pacientes adultos
 router.get("/", logAccesoAdultoMiddleware('LISTAR_PACIENTES_ADULTOS'), async (req, res) => {
   try {
-    const pacientes = await PacienteAdulto.find();
+    const pacientes = await PacienteAdulto.find()
+      .select('nombres cedula genero edad estadoEmbarazo aseguradora')
+      .sort({ nombres: 1 });
     res.json(pacientes);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener pacientes adultos" });
