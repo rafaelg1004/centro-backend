@@ -43,16 +43,21 @@ mongoose.connect(process.env.MONGODB_URI)
   })
   .catch(err => console.error('❌ Error al conectar a MongoDB Atlas:', err));
 
-// Rutas
+// Rutas Públicas (Sin Token)
+app.use('/api/auth', require('./routes/auth'));
+app.use("/api", require("./routes/proxy-images"));
+app.use("/api", require("./routes/proxyImages"));
+app.get('/api/health', async (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Rutas Protegidas (Con Token)
 const { verificarToken } = require("./routes/auth");
 
 app.use("/api", verificarToken(), require("./routes/exportarWord"));
 app.use("/api", verificarToken(), require("./routes/exportar-pdf"));
-app.use("/api", require("./routes/proxy-images"));
-app.use("/api", require("./routes/proxyImages"));
 app.use("/api/clases", verificarToken(), require("./routes/clases"));
 app.use('/api/pagoPaquete', verificarToken(), require('./routes/pagoPaquetes'));
-app.use('/api/auth', require('./routes/auth'));
 app.use('/api/valoraciones', verificarToken(), require('./routes/valoraciones'));
 app.use('/api/pacientes', verificarToken(), require('./routes/pacientes'));
 app.use('/api/pacientes-adultos', verificarToken(), require('./routes/pacientesAdultos'));
