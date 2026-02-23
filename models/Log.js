@@ -14,7 +14,7 @@ const logSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['AUTH', 'PACIENTE', 'VALORACION', 'CLASE', 'RIPS', 'API', 'SYSTEM'],
+    enum: ['AUTH', 'PACIENTE', 'VALORACION', 'CLASE', 'RIPS', 'API', 'SYSTEM', 'HC_SEGURIDAD'],
     required: true
   },
   action: {
@@ -26,8 +26,8 @@ const logSchema = new mongoose.Schema({
     default: 'desconocido'
   },
   paciente: {
-    type: String,
-    default: 'desconocido'
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Paciente'
   },
   valoracion: {
     type: String,
@@ -57,12 +57,12 @@ logSchema.index({ user: 1, timestamp: -1 });
 logSchema.index({ level: 1, timestamp: -1 });
 
 // Método estático para crear log
-logSchema.statics.createLog = function(data) {
+logSchema.statics.createLog = function (data) {
   return new this(data).save();
 };
 
 // Método para obtener logs con filtros
-logSchema.statics.getLogs = function(filters = {}, options = {}) {
+logSchema.statics.getLogs = function (filters = {}, options = {}) {
   const query = {};
 
   if (filters.category) query.category = filters.category;

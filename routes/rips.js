@@ -6,11 +6,10 @@ const express = require('express');
 const router = express.Router();
 const RIPSConverter = require('../ripsConverter');
 const Paciente = require('../models/Paciente');
-const PacienteAdulto = require('../models/PacienteAdulto');
-const ValoracionIngreso = require('../models/ValoracionIngreso');
+const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
+const EvolucionSesion = require('../models/EvolucionSesion');
 const Clase = require('../models/Clase');
-const SesionPerinatalPaciente = require('../models/SesionPerinatalPaciente');
-const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
+
 
 // Middleware de autenticación (simplificado)
 const authenticate = (req, res, next) => {
@@ -42,7 +41,7 @@ router.post('/generate', authenticate, async (req, res) => {
     // Si no se proporcionan IDs, buscar dinámicamente según servicios en el rango de fechas
     if (!idsParaProcesar.length && (fechaInicio || fechaFin)) {
       console.log('🔍 Buscando pacientes dinámicamente por servicios en el rango de fechas...');
-      
+
       const fechaQuery = {
         ...(fechaInicio || fechaFin ? {
           fecha: {
@@ -65,7 +64,7 @@ router.post('/generate', authenticate, async (req, res) => {
       ]);
 
       const idsEncontrados = new Set();
-      
+
       valoracionesNinos.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
       clases.forEach(c => c.ninos.forEach(n => n.paciente && idsEncontrados.add(n.paciente.toString())));
       sesionesAdultos.forEach(s => s.paciente && idsEncontrados.add(s.paciente.toString()));
@@ -159,10 +158,10 @@ router.post('/generate', authenticate, async (req, res) => {
       }
 
       // 🛑 FILTRO IMPORTANTE: Si el paciente no tiene servicios en este rango, NO incluirlo
-      if (valoracionesIngreso.length === 0 && 
-          clases.length === 0 && 
-          sesionesPerinatales.length === 0 && 
-          valoracionesPisoPelvico.length === 0) {
+      if (valoracionesIngreso.length === 0 &&
+        clases.length === 0 &&
+        sesionesPerinatales.length === 0 &&
+        valoracionesPisoPelvico.length === 0) {
         // console.log(`⏩ Saltando paciente ${paciente.nombres || paciente.nombre} - Sin servicios en el rango`);
         continue;
       }

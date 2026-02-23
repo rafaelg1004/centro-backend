@@ -5,12 +5,17 @@ const ClaseSchema = new mongoose.Schema({
   fecha: String,
   descripcion: String,
   ninos: [
-  {
-    nino: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
-    firma: String,
-    numeroFactura: String // Nuevo campo
-  }
-]
-});
+    {
+      paciente: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
+      firma: String,
+      numeroFactura: String,
+      auditTrail: { type: Object, default: {} } // Pista de auditoría para la firma del asistente
+    }
+  ],
+  bloqueada: { type: Boolean, default: false },
+  fechaBloqueo: Date,
+  selloIntegridad: String,
+  auditTrail: { type: Object, default: {} } // Pista de auditoría para la firma general de la clase
+}, { timestamps: true });
 
 module.exports = mongoose.model("Clase", ClaseSchema);

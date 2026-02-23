@@ -125,8 +125,33 @@ router.get("/:id", async (req, res) => {
 // Actualizar sesión mensual (incluyendo asistentes y qué se hizo)
 router.put("/:id", async (req, res) => {
   try {
-    const sesion = await SesionMensual.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!sesion) return res.status(404).json({ error: "Sesión no encontrada" });
+    const { generarHash, obtenerMetadatosPista } = require('../utils/auditUtils');
+    const sesionActual = await SesionMensual.findById(req.params.id);
+
+    if (!sesionActual) return res.status(404).json({ error: "Sesión no encontrada" });
+    if (sesionActual.bloqueada && !req.body.forzarDesbloqueo) {
+      return res.status(403).json({ error: "Sesión bloqueada e inmutable" });
+    }
+
+    // Capture audit trail for signature
+    if (req.body.firmaFisioterapeuta && req.body.firmaFisioterapeuta !== sesionActual.firmaFisioterapeuta) {
+      const metadatos = obtenerMetadatosPista(req);
+      metadatos.registroProfesional = req.usuario?.registroMedico || 'No registrado';
+      if (!req.body.auditTrail) req.body.auditTrail = sesionActual.auditTrail || {};
+      req.body.auditTrail.firmaFisioterapeuta = metadatos;
+    }
+
+    // Seal registry if blocking
+    if (req.body.bloqueada && !sesionActual.bloqueada) {
+      req.body.fechaBloqueo = new Date();
+      req.body.selloIntegridad = generarHash({
+        contenido: req.body,
+        auditTrail: req.body.auditTrail || sesionActual.auditTrail,
+        fechaBloqueo: req.body.fechaBloqueo
+      });
+    }
+
+    const sesion = await SesionMensual.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate("asistentes.nino");
     res.json(sesion);
   } catch (e) {
     res.status(500).json({ error: e.message });

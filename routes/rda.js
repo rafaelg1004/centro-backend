@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const fhirMapper = require('../utils/fhirMapper');
 const Paciente = require('../models/Paciente');
-const PacienteAdulto = require('../models/PacienteAdulto');
-const ValoracionIngreso = require('../models/ValoracionIngreso');
-const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
+const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
+const EvolucionSesion = require('../models/EvolucionSesion');
+
 
 // Middleware de autenticación (Placeholder)
 const authenticate = (req, res, next) => {
@@ -43,7 +43,7 @@ router.get('/patient/:id', authenticate, async (req, res) => {
 
     // 1. Composition (Header)
     const composition = fhirMapper.createComposition(id, "practitioner-default", null, "patient-summary");
-    
+
     // 2. Patient
     const patientResource = fhirMapper.createPatient(paciente);
     entries.push({ resource: patientResource });
@@ -73,7 +73,7 @@ router.get('/patient/:id', authenticate, async (req, res) => {
       }
 
       // Problemas / Antecedentes
-      const patologicosText = isAdult ? ultimaValoracion.patologiaCardio : ultimaValoracion.patologicos; 
+      const patologicosText = isAdult ? ultimaValoracion.patologiaCardio : ultimaValoracion.patologicos;
       const condRes = fhirMapper.createCondition(patologicosText, id, 'problem-list-item');
       if (condRes) {
         entries.push({ resource: condRes });
@@ -89,7 +89,7 @@ router.get('/patient/:id', authenticate, async (req, res) => {
       }
     }
 
-    entries.unshift({ resource: composition }); 
+    entries.unshift({ resource: composition });
 
     const bundle = fhirMapper.createBundle("document", entries);
     res.json(bundle);
@@ -136,7 +136,7 @@ router.get('/encounter/:id', authenticate, async (req, res) => {
 
     // 2. Composition
     const composition = fhirMapper.createComposition(patientId, "practitioner-default", encounterResource.id, "ambulatory-summary");
-    
+
     // 3. Context Resources
     entries.push({ resource: fhirMapper.createPatient(paciente) }); // Inclusion of patient is mandatory in document Bundle
     entries.push({ resource: fhirMapper.createPractitioner() });

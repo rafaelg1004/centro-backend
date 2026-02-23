@@ -5,7 +5,7 @@ const fs = require("fs");
 
 const router = express.Router();
 
-// Función para registrar logs de acceso a datos de pacientes
+// FunciÃ³n para registrar logs de acceso a datos de pacientes
 function logAccesoPaciente(tipo, usuario, pacienteId, detalles = {}) {
   const logEntry = {
     timestamp: new Date().toISOString(),
@@ -20,7 +20,6 @@ function logAccesoPaciente(tipo, usuario, pacienteId, detalles = {}) {
   const logFile = path.join(__dirname, '../logs/acceso-pacientes.log');
   const logDir = path.dirname(logFile);
 
-  // Crear directorio si no existe
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
@@ -29,13 +28,12 @@ function logAccesoPaciente(tipo, usuario, pacienteId, detalles = {}) {
 
   try {
     fs.appendFileSync(logFile, logLine);
-    console.log(`📋 LOG PACIENTE [${tipo}]: ${usuario || 'desconocido'} - Paciente: ${pacienteId} - ${detalles.accion || 'Sin acción'}`);
+    console.log(`ðŸ“‹ LOG PACIENTE [${tipo}]: ${usuario || 'desconocido'} - Paciente: ${pacienteId} - ${detalles.accion || 'Sin acciÃ³n'}`);
   } catch (error) {
-    console.error('❌ Error escribiendo log de acceso a pacientes:', error);
+    console.error('â Œ Error escribiendo log de acceso a pacientes:', error);
   }
 }
 
-// Middleware para logging de acceso a pacientes
 const logAccesoMiddleware = (accion) => {
   return (req, res, next) => {
     const usuario = req.usuario?.usuario || 'desconocido';
@@ -55,34 +53,77 @@ const logAccesoMiddleware = (accion) => {
   };
 };
 
+// --- RUTAS DE PACIENTE UNIFICADO ---
+
 router.post("/", async (req, res) => {
   try {
-    console.log("Datos recibidos en el backend:", req.body); // <-- AQUÍ
-    const existe = await Paciente.findOne({ registroCivil: req.body.registroCivil });
+    console.log("ðŸ“ Datos recibidos en el backend:", req.body);
+
+    // Mapeo de compatibilidad para el frontend legacy
+    const docNum = req.body.numDocumentoIdentificacion || req.body.registroCivil || req.body.cedula;
+    const tipoDoc = req.body.tipoDocumentoIdentificacion || req.body.tipoDocumento || (req.body.cedula ? 'CC' : 'RC');
+
+    if (!docNum) {
+      return res.status(400).json({ error: "El nÃºmero de documento es obligatorio" });
+    }
+
+    const existe = await Paciente.findOne({ numDocumentoIdentificacion: docNum });
     if (existe) {
       return res.status(400).json({ error: "El paciente ya existe" });
     }
-    const paciente = new Paciente(req.body);
+
+    // Preparar objeto para el nuevo modelo
+    const data = {
+      ...req.body,
+      numDocumentoIdentificacion: docNum,
+      tipoDocumentoIdentificacion: tipoDoc,
+      // Si no vienen nombres/apellidos separados, intentar separar nombres
+      nombres: req.body.nombres,
+      apellidos: req.body.apellidos || (req.body.nombres ? '' : 'SIN APELLIDO')
+    };
+
+    // Mapear datos de contacto si vienen en formato plano (legacy)
+    if (!data.datosContacto) {
+      data.datosContacto = {
+        direccion: req.body.direccion,
+        telefono: req.body.telefono || req.body.celular,
+        nombreAcompanante: req.body.acompanante || req.body.nombreMadre || req.body.nombrePadre,
+        telefonoAcompanante: req.body.telefonoAcompanante
+      };
+    }
+
+    const paciente = new Paciente(data);
     await paciente.save();
-    res.json({ mensaje: "Paciente registrado correctamente" });
+    res.json({ mensaje: "Paciente registrado correctamente", id: paciente._id });
   } catch (error) {
-    console.error("Error al registrar paciente:", error);
-    res.status(500).json({ error: "Error en el servidor" });
+    console.error("â Œ Error al registrar paciente:", error);
+    res.status(500).json({ error: "Error en el servidor", details: error.message });
   }
 });
+
 router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
   try {
     const pacientes = await Paciente.find()
-      .select('nombres registroCivil genero edad fechaNacimiento aseguradora')
+      .select('nombres apellidos numDocumentoIdentificacion codSexo fechaNacimiento aseguradora')
       .sort({ nombres: 1 });
-    res.json(pacientes);
+
+    // Mapeo de compatibilidad para el frontend que espera campos antiguos
+    const mapiado = pacientes.map(p => ({
+      ...p._doc,
+      registroCivil: p.numDocumentoIdentificacion, // Alias legacy
+      cedula: p.numDocumentoIdentificacion, // Alias legacy
+      genero: p.codSexo, // Alias legacy
+      nombres: `${p.nombres} ${p.apellidos}`.trim()
+    }));
+
+    res.json(mapiado);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener pacientes" });
   }
 });
 
 router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) => {
-  const { q } = req.query; // Usamos "q" como parámetro de búsqueda general
+  const { q } = req.query;
   try {
     if (!q || q.trim() === "") {
       return res.json([]);
@@ -90,11 +131,19 @@ router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) 
     const pacientes = await Paciente.find({
       $or: [
         { nombres: { $regex: q, $options: "i" } },
-        { registroCivil: { $regex: q, $options: "i" } },
-        { cedula: { $regex: q, $options: "i" } }
+        { apellidos: { $regex: q, $options: "i" } },
+        { numDocumentoIdentificacion: { $regex: q, $options: "i" } }
       ]
     }).sort({ nombres: 1 }).limit(20);
-    res.json(pacientes);
+
+    const mapiado = pacientes.map(p => ({
+      ...p._doc,
+      registroCivil: p.numDocumentoIdentificacion,
+      cedula: p.numDocumentoIdentificacion,
+      nombres: `${p.nombres} ${p.apellidos}`.trim()
+    }));
+
+    res.json(mapiado);
   } catch (e) {
     console.error("Error en /buscar:", e);
     res.json([]);
@@ -103,23 +152,35 @@ router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) 
 
 router.get("/recientes", async (req, res) => {
   try {
-    const pacientes = await Paciente.find().sort({ _id: -1 }).limit(10);
+    const pacientes = await Paciente.find().sort({ createdAt: -1 }).limit(10);
     res.json(pacientes);
   } catch (e) {
     res.status(500).json({ error: "Error al obtener pacientes recientes" });
   }
 });
 
-// ¡AHORA la ruta con parámetro va al final!
 router.get("/:id", logAccesoMiddleware('CONSULTAR_PACIENTE'), async (req, res) => {
   try {
     const paciente = await Paciente.findById(req.params.id);
     if (!paciente) return res.status(404).json({ error: "No encontrado" });
-    res.json(paciente);
+
+    // Envolver en compatibilidad
+    const data = {
+      ...paciente._doc,
+      registroCivil: paciente.numDocumentoIdentificacion,
+      cedula: paciente.numDocumentoIdentificacion,
+      genero: paciente.codSexo,
+      direccion: paciente.datosContacto?.direccion,
+      telefono: paciente.datosContacto?.telefono,
+      acompanante: paciente.datosContacto?.nombreAcompanante
+    };
+
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener paciente" });
   }
 });
+
 router.delete("/:id", logAccesoMiddleware('ELIMINAR_PACIENTE'), async (req, res) => {
   try {
     await Paciente.findByIdAndDelete(req.params.id);
@@ -129,12 +190,23 @@ router.delete("/:id", logAccesoMiddleware('ELIMINAR_PACIENTE'), async (req, res)
   }
 });
 
-// Actualizar paciente por ID
 router.put('/:id', logAccesoMiddleware('ACTUALIZAR_PACIENTE'), async (req, res) => {
   try {
+    // Al actualizar, tambiÃ©n manejamos la estructura anidada si el frontend manda datos planos
+    const updateData = { ...req.body };
+
+    if (req.body.direccion || req.body.telefono || req.body.celular || req.body.acompanante) {
+      updateData.datosContacto = {
+        direccion: req.body.direccion || (updateData.datosContacto?.direccion),
+        telefono: req.body.telefono || req.body.celular || (updateData.datosContacto?.telefono),
+        nombreAcompanante: req.body.acompanante || (updateData.datosContacto?.nombreAcompanante),
+        telefonoAcompanante: req.body.telefonoAcompanante || (updateData.datosContacto?.telefonoAcompanante)
+      };
+    }
+
     const actualizado = await Paciente.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
     if (!actualizado) {

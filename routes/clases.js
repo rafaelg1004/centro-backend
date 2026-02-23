@@ -86,10 +86,14 @@ router.post("/:id/asignar-paquete", async (req, res) => {
 // Guardar firma de un niño
 router.post("/:id/firma-nino", async (req, res) => {
   try {
+    const { obtenerMetadatosPista } = require('../utils/auditUtils');
     const clase = await Clase.findById(req.params.id);
+    if (clase.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+
     const nino = clase.ninos.find(n => n.nino.toString() === req.body.ninoId);
     if (nino) {
       nino.firma = req.body.firma;
+      nino.auditTrail = obtenerMetadatosPista(req);
       await clase.save();
       res.json(clase);
     } else {
@@ -156,8 +160,12 @@ router.get("/:id", async (req, res) => {
 // Guardar firma al finalizar clase (opcional, si quieres una firma general)
 router.post("/:id/firma", async (req, res) => {
   try {
+    const { obtenerMetadatosPista } = require('../utils/auditUtils');
     const clase = await Clase.findById(req.params.id);
+    if (clase.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+
     clase.firma = req.body.firma;
+    clase.auditTrail = obtenerMetadatosPista(req);
     await clase.save();
     res.json(clase);
   } catch (e) {
@@ -231,8 +239,23 @@ router.get("/paciente/:id", async (req, res) => {
 // Editar (actualizar) una clase por ID
 router.put("/:id", async (req, res) => {
   try {
+    const { generarHash, obtenerMetadatosPista } = require('../utils/auditUtils');
+    const claseActual = await Clase.findById(req.params.id);
+    if (!claseActual) return res.status(404).json({ error: "Clase no encontrada" });
+    if (claseActual.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+
+    // Si se está bloqueando el registro
+    if (req.body.bloqueada && !claseActual.bloqueada) {
+      req.body.fechaBloqueo = new Date();
+      req.body.selloIntegridad = generarHash({
+        contenido: req.body,
+        auditTrail: req.body.auditTrail || claseActual.auditTrail,
+        ninos: req.body.ninos || claseActual.ninos,
+        fechaBloqueo: req.body.fechaBloqueo
+      });
+    }
+
     const clase = await Clase.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
     res.json(clase);
   } catch (e) {
     res.status(500).json({ error: e.message });

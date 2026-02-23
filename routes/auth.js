@@ -20,6 +20,7 @@ const usuarioSchema = new mongoose.Schema({
     enum: ['fisioterapeuta', 'auxiliar', 'administracion'],
     default: 'auxiliar'
   },
+  registroMedico: { type: String, default: "" }, // Registro profesional para validación de firmas
   twoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret: { type: String, default: null },
   ultimoAcceso: { type: Date, default: null },
@@ -139,6 +140,7 @@ router.post("/login", async (req, res) => {
         nombre: usuarioDoc.nombre,
         id: usuarioDoc._id,
         rol: usuarioDoc.rol,
+        registroMedico: usuarioDoc.registroMedico,
         twoFactorEnabled: usuarioDoc.twoFactorEnabled
       },
       process.env.JWT_SECRET,
@@ -179,6 +181,7 @@ router.post("/login", async (req, res) => {
       token,
       nombre: usuarioDoc.nombre,
       rol: usuarioDoc.rol,
+      registroMedico: usuarioDoc.registroMedico,
       requiere2FA: false
     });
   } catch (error) {
@@ -198,7 +201,7 @@ router.post("/login", async (req, res) => {
 
 // Ruta para registrar un usuario (solo para administración)
 router.post("/register", async (req, res) => {
-  const { email, usuario, password, nombre, rol } = req.body;
+  const { email, usuario, password, nombre, rol, registroMedico } = req.body;
   if (!usuario && !email) {
     return res.status(400).json({ error: "Debes ingresar un usuario o un correo electrónico" });
   }
@@ -224,7 +227,8 @@ router.post("/register", async (req, res) => {
       usuario,
       passwordHash,
       nombre,
-      rol: rol || 'auxiliar'
+      rol: rol || 'auxiliar',
+      registroMedico: registroMedico || ""
     });
 
     // Generar 2FA para el nuevo usuario
@@ -451,6 +455,7 @@ router.post("/verify-2fa-login", async (req, res) => {
         nombre: usuario.nombre,
         id: usuario._id,
         rol: usuario.rol,
+        registroMedico: usuario.registroMedico,
         twoFactorEnabled: usuario.twoFactorEnabled
       },
       process.env.JWT_SECRET,
@@ -542,6 +547,7 @@ router.get("/me", verificarToken(), async (req, res) => {
       email: usuario.email,
       usuario: usuario.usuario,
       rol: usuario.rol,
+      registroMedico: usuario.registroMedico,
       twoFactorEnabled: usuario.twoFactorEnabled,
       ultimoAcceso: usuario.ultimoAcceso
     });

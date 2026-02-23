@@ -6,10 +6,15 @@ const SesionMensualSchema = new mongoose.Schema({
   descripcionGeneral: String, // Lo que se hizo de forma general
   asistentes: [
     {
-      nino: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
+      paciente: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
       observaciones: String, // Qué hizo/cómo le fue a cada niño específicamente
     }
-  ]
+  ],
+  firmaFisioterapeuta: String,
+  bloqueada: { type: Boolean, default: false },
+  fechaBloqueo: Date,
+  selloIntegridad: String,
+  auditTrail: { type: Object, default: {} }
 }, { timestamps: true });
 
 module.exports = mongoose.model("SesionMensual", SesionMensualSchema);

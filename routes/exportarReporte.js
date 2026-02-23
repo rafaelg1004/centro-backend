@@ -1,82 +1,58 @@
 const express = require('express');
 const router = express.Router();
-const ValoracionIngreso = require('../models/ValoracionIngreso');
-const ValoracionPisoPelvico = require('../models/ValoracionPisoPelvico');
-const ValoracionLactancia = require('../models/ValoracionIngresoAdultosLactancia');
-const ConsentimientoPerinatal = require('../models/ConsentimientoPerinatal');
-const pdfGenerator = require('../utils/pdfReportGenerator');
+// Modelo unificado - reemplaza todos los modelos de valoración
+const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
 
 /**
  * GET /api/valoraciones/reporte/exportar-pdf/:id
- * Exporta una valoración completa con firmas desde el backend
+ * Exporta una valoración completa con firmas desde el backend.
+ * Ahora busca en la colección única `valoracionfisioterapias`.
  */
 router.get('/exportar-pdf/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { type } = req.query; // 'nino', 'adulto', 'lactancia', 'perinatal'
+    const { type } = req.query;
 
-    let valoracion;
-    let paciente;
-    let reportType = type || 'nino';
-
-    // 1. Intentar buscar en todos los modelos si no se especifica el tipo o falla el inicial
-    if (reportType === 'nino') {
-      valoracion = await ValoracionIngreso.findById(id).populate('paciente');
-    } else if (reportType === 'adulto' || reportType === 'piso-pelvico') {
-      valoracion = await ValoracionPisoPelvico.findById(id).populate('paciente');
-      reportType = 'adulto';
-    } else if (reportType === 'lactancia') {
-      valoracion = await ValoracionLactancia.findById(id).populate('paciente');
-    } else if (reportType === 'perinatal') {
-      valoracion = await ConsentimientoPerinatal.findById(id).populate('paciente');
-    }
-
-    // Fallback: si no se encontró con el tipo dado, buscar en los demás
-    if (!valoracion) {
-        valoracion = await ValoracionIngreso.findById(id).populate('paciente');
-        if (valoracion) reportType = 'nino';
-    }
-    if (!valoracion) {
-        valoracion = await ValoracionPisoPelvico.findById(id).populate('paciente');
-        if (valoracion) reportType = 'adulto';
-    }
-    if (!valoracion) {
-        valoracion = await ValoracionLactancia.findById(id).populate('paciente');
-        if (valoracion) reportType = 'lactancia';
-    }
-    if (!valoracion) {
-        valoracion = await ConsentimientoPerinatal.findById(id).populate('paciente');
-        if (valoracion) reportType = 'perinatal';
-    }
+    // Buscar en el modelo unificado. Usamos `+_datosLegacy` para incluir ese campo.
+    const valoracion = await ValoracionFisioterapia.findById(id)
+      .select('+_datosLegacy')
+      .populate('paciente');
 
     if (!valoracion) {
-      return res.status(404).json({ message: 'Valoración no encontrada en ningún registro' });
+      return res.status(404).json({ message: 'Valoración no encontrada' });
     }
 
-    paciente = valoracion.paciente;
-    if (!paciente) {
-        // En algunos casos el paciente podría estar embebido directamente (legacy o fallback)
-        paciente = {
-            nombres: valoracion.nombres || 'Paciente Desconocido',
-            cedula: valoracion.cedula || valoracion.registroCivil || 'S/D',
-            genero: valoracion.genero || 'N/A',
-            fechaNacimiento: valoracion.fechaNacimiento || 'N/A',
-            edad: valoracion.edad || 'N/A',
-            direccion: valoracion.direccion || 'N/A',
-            celular: valoracion.celular || valoracion.telefono || 'N/A'
-        };
+    // Determinar el tipo de reporte según el módulo activo
+    let reportType = type;
+    if (!reportType) {
+      if (valoracion.moduloPediatria?.desarrolloMotor) reportType = 'nino';
+      else if (valoracion.moduloPisoPelvico?.icicq_frecuencia) reportType = 'adulto';
+      else if (valoracion.moduloLactancia?.experienciaLactancia) reportType = 'lactancia';
+      else if (valoracion.codConsulta === '890204') reportType = 'perinatal';
+      else reportType = 'nino';
     }
 
-    // 2. Generar el PDF
-    const pdfBuffer = await pdfGenerator.generateValuationPDF(valoracion, paciente, reportType);
+    const paciente = valoracion.paciente || {
+      nombres: valoracion.nombres || 'Paciente Desconocido',
+      cedula: valoracion.numDocumentoIdentificacion || 'S/D',
+      genero: valoracion.codSexo || 'N/A',
+    };
 
-    // 3. Enviar respuesta
-    const sanitizedName = paciente.nombres ? paciente.nombres.replace(/\s+/g, '_') : 'REPORTE';
-    const fileName = `REPORTE_${reportType.toUpperCase()}_${sanitizedName}.pdf`;
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-    res.send(pdfBuffer);
+    // Intentar cargar el generador de PDF si existe
+    try {
+      const pdfGenerator = require('../utils/pdfReportGenerator');
+      const pdfBuffer = await pdfGenerator.generateValuationPDF(valoracion, paciente, reportType);
+      const sanitizedName = (paciente.nombres || 'REPORTE').replace(/\s+/g, '_');
+      const fileName = `REPORTE_${reportType.toUpperCase()}_${sanitizedName}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+      res.send(pdfBuffer);
+    } catch (pdfErr) {
+      // Si el generador de PDF falla, devolver los datos en JSON para debug
+      console.warn('PDF generator not available, returning JSON data:', pdfErr.message);
+      res.json({ valoracion, paciente, reportType });
+    }
 
   } catch (error) {
     console.error('Error exportando reporte PDF:', error);

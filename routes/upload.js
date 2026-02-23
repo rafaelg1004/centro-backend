@@ -33,38 +33,89 @@ router.post('/upload', upload.single('imagen'), (req, res) => {
   res.json({ url: req.file.location });
 });
 
+// Función auxiliar para extraer key de S3 desde una URL
+const extraerKeyDeUrl = (urlStr) => {
+  try {
+    const url = new URL(urlStr);
+    return url.pathname.substring(1); // Remover el primer "/"
+  } catch (error) {
+    return null;
+  }
+};
+
 // Nuevo endpoint para eliminar imagen de S3
 router.delete('/delete-image', async (req, res) => {
   try {
     const { imageUrl } = req.body;
-    
-    console.log('Recibida solicitud para eliminar imagen:', imageUrl);
-    
+
     if (!imageUrl) {
       return res.status(400).json({ error: 'URL de imagen requerida' });
     }
 
-    // Extraer la key del objeto de la URL
-    const url = new URL(imageUrl);
-    const key = url.pathname.substring(1); // Remover el primer "/"
-    
+    const key = extraerKeyDeUrl(imageUrl);
+    if (!key) {
+      return res.status(400).json({ error: 'URL de imagen inválida' });
+    }
+
     console.log('Key extraída para eliminar:', key);
 
-    // Crear comando para eliminar objeto
     const deleteCommand = new DeleteObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key
     });
 
-    // Ejecutar eliminación
     await s3Client.send(deleteCommand);
-    
-    console.log('Imagen eliminada exitosamente de S3:', key);
-    
     res.json({ success: true, message: 'Imagen eliminada correctamente' });
   } catch (error) {
     console.error('Error al eliminar imagen:', error);
     res.status(500).json({ error: 'Error al eliminar imagen de S3' });
+  }
+});
+
+// Endpoint para eliminar firmas de S3 en bloque (Mantenido desde index.js refactorizado)
+router.post('/eliminar-firmas-s3', async (req, res) => {
+  try {
+    const { urls } = req.body;
+
+    if (!urls || !Array.isArray(urls)) {
+      return res.status(400).json({ error: 'Se requiere un array de URLs' });
+    }
+
+    console.log(`Eliminando ${urls.length} firmas de S3...`);
+    const resultados = [];
+
+    for (const url of urls) {
+      const key = extraerKeyDeUrl(url);
+      if (!key) {
+        resultados.push({ url, success: false, error: 'URL inválida' });
+        continue;
+      }
+
+      try {
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: key
+        });
+        await s3Client.send(deleteCommand);
+        resultados.push({ url, success: true });
+      } catch (err) {
+        resultados.push({ url, success: false, error: err.message });
+      }
+    }
+
+    const exitosos = resultados.filter(r => r.success).length;
+    const fallidos = resultados.filter(r => !r.success).length;
+
+    res.json({
+      mensaje: `Eliminación completada: ${exitosos} exitosos, ${fallidos} fallidos`,
+      resultados,
+      exitosos,
+      fallidos
+    });
+
+  } catch (error) {
+    console.error('Error eliminando firmas de S3:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

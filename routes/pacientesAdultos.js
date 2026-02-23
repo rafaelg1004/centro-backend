@@ -1,160 +1,156 @@
+/**
+ * RUTA LEGACY: /api/pacientes-adultos
+ * 
+ * Este archivo ahora actúa como un proxy hacia el modelo unificado `Paciente`.
+ * Mantiene la compatibilidad con el frontend anterior que usa rutas separadas
+ * para pacientes pediátricos y adultos.
+ * 
+ * Todos los pacientes (adultos y niños) ahora se guardan en la misma colección
+ * usando el modelo `Paciente` unificado.
+ */
 const express = require("express");
-const PacienteAdulto = require("../models/PacienteAdulto");
-const path = require("path");
-const fs = require("fs");
+const Paciente = require("../models/Paciente");
 
 const router = express.Router();
 
-// Función para registrar logs de acceso a datos de pacientes adultos
-function logAccesoPacienteAdulto(tipo, usuario, pacienteId, detalles = {}) {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    tipo,
-    usuario: usuario || 'desconocido',
-    pacienteId,
-    ip: detalles.ip || 'N/A',
-    userAgent: detalles.userAgent || 'N/A',
-    ...detalles
-  };
-
-  const logFile = path.join(__dirname, '../logs/acceso-pacientes-adultos.log');
-  const logDir = path.dirname(logFile);
-
-  // Crear directorio si no existe
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-
-  const logLine = JSON.stringify(logEntry) + '\n';
-
-  try {
-    fs.appendFileSync(logFile, logLine);
-    console.log(`📋 LOG PACIENTE ADULTO [${tipo}]: ${usuario || 'desconocido'} - Paciente: ${pacienteId} - ${detalles.accion || 'Sin acción'}`);
-  } catch (error) {
-    console.error('❌ Error escribiendo log de acceso a pacientes adultos:', error);
-  }
-}
-
-// Middleware para logging de acceso a pacientes adultos
-const logAccesoAdultoMiddleware = (accion) => {
-  return (req, res, next) => {
-    const usuario = req.usuario?.usuario || 'desconocido';
-    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    const pacienteId = req.params.id || 'multiple';
-
-    logAccesoPacienteAdulto('ACCESO_PACIENTE_ADULTO', usuario, pacienteId, {
-      ip: clientIP,
-      userAgent,
-      accion,
-      metodo: req.method,
-      endpoint: req.originalUrl
-    });
-
-    next();
-  };
-};
-
-// Registrar paciente adulto
+// Registrar paciente adulto (Proxy al modelo Paciente unificado)
 router.post("/", async (req, res) => {
   try {
-    console.log("📝 Datos recibidos para registro:", req.body);
+    const docNum = req.body.numDocumentoIdentificacion || req.body.cedula;
+    const tipoDoc = req.body.tipoDocumentoIdentificacion || 'CC';
 
-    const existe = await PacienteAdulto.findOne({ cedula: req.body.cedula });
+    if (!docNum) {
+      return res.status(400).json({ error: "La cédula es obligatoria." });
+    }
+
+    const existe = await Paciente.findOne({ numDocumentoIdentificacion: docNum });
     if (existe) {
-      return res.status(400).json({ error: "El paciente adulto ya existe" });
+      return res.status(400).json({ error: "El paciente ya existe", id: existe._id });
     }
 
-    // Validar que el estadoEmbarazo sea válido
-    if (req.body.estadoEmbarazo && !['gestacion', 'posparto'].includes(req.body.estadoEmbarazo)) {
-      return res.status(400).json({ error: "Estado de embarazo inválido" });
-    }
+    // Mapear campos del formulario legacy al nuevo modelo
+    const nameParts = (req.body.nombres || '').trim().split(' ');
+    const nombres = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
+    const apellidos = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ') || 'SIN APELLIDO';
 
-    const paciente = new PacienteAdulto(req.body);
+    const data = {
+      ...req.body,
+      nombres,
+      apellidos,
+      tipoDocumentoIdentificacion: tipoDoc,
+      numDocumentoIdentificacion: docNum,
+      fechaNacimiento: req.body.fechaNacimiento ? new Date(req.body.fechaNacimiento) : new Date(1990, 0, 1),
+      codSexo: (req.body.genero && req.body.genero.toLowerCase().startsWith('m')) ? 'M' : 'F',
+      estadoCivil: req.body.estadoCivil,
+      ocupacion: req.body.ocupacion,
+      datosContacto: {
+        direccion: req.body.direccion,
+        telefono: req.body.telefono || req.body.celular,
+        nombreAcompanante: req.body.acompanante,
+        telefonoAcompanante: req.body.telefonoAcompanante
+      }
+    };
+
+    const paciente = new Paciente(data);
     await paciente.save();
-
-    console.log("✅ Paciente adulto registrado:", paciente._id);
-    res.json({ mensaje: "Paciente adulto registrado correctamente" });
+    res.json({ mensaje: "Paciente registrado correctamente", id: paciente._id });
   } catch (error) {
-    console.error("❌ Error al registrar paciente adulto:", error);
-    res.status(500).json({ error: "Error al registrar paciente adulto", details: error.message });
+    console.error("Error al registrar paciente adulto:", error);
+    res.status(500).json({ error: "Error al registrar paciente", details: error.message });
   }
 });
 
-// Obtener todos los pacientes adultos
-router.get("/", logAccesoAdultoMiddleware('LISTAR_PACIENTES_ADULTOS'), async (req, res) => {
+// Obtener todos los pacientes adultos (Filtra por tipo de documento adulto)
+router.get("/", async (req, res) => {
   try {
-    const pacientes = await PacienteAdulto.find()
-      .select('nombres cedula genero edad estadoEmbarazo aseguradora')
+    const pacientes = await Paciente.find({
+      tipoDocumentoIdentificacion: { $in: ['CC', 'CE', 'PA'] }
+    })
+      .select('nombres apellidos numDocumentoIdentificacion codSexo fechaNacimiento aseguradora')
       .sort({ nombres: 1 });
-    res.json(pacientes);
+
+    // Mapeo de compatibilidad
+    const mapiado = pacientes.map(p => ({
+      _id: p._id,
+      nombres: `${p.nombres} ${p.apellidos}`.trim(),
+      cedula: p.numDocumentoIdentificacion,
+      genero: p.codSexo,
+      aseguradora: p.aseguradora,
+      createdAt: p.createdAt
+    }));
+    res.json(mapiado);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener pacientes adultos" });
+    res.status(500).json({ error: "Error al obtener pacientes" });
   }
 });
 
 // Buscar pacientes adultos por nombre o cédula
-router.get("/buscar", logAccesoAdultoMiddleware('BUSCAR_PACIENTES_ADULTOS'), async (req, res) => {
+router.get("/buscar", async (req, res) => {
   try {
     const q = req.query.q || "";
-    console.log("Buscando adultos con:", q);
-    const pacientes = await PacienteAdulto.find({
+    const pacientes = await Paciente.find({
+      tipoDocumentoIdentificacion: { $in: ['CC', 'CE', 'PA'] },
       $or: [
         { nombres: { $regex: q, $options: "i" } },
-        { cedula: { $regex: q, $options: "i" } }
+        { apellidos: { $regex: q, $options: "i" } },
+        { numDocumentoIdentificacion: { $regex: q, $options: "i" } }
       ]
-    });
-    res.json(pacientes);
+    }).limit(20);
+
+    const mapiado = pacientes.map(p => ({
+      _id: p._id,
+      nombres: `${p.nombres} ${p.apellidos}`.trim(),
+      cedula: p.numDocumentoIdentificacion,
+      aseguradora: p.aseguradora
+    }));
+    res.json(mapiado);
   } catch (error) {
-    console.error("Error en /buscar adultos:", error);
-    res.status(500).json({ error: "Error al buscar pacientes adultos" });
+    res.status(500).json({ error: "Error al buscar pacientes" });
   }
 });
 
 // Obtener paciente adulto por ID
-router.get("/:id", logAccesoAdultoMiddleware('CONSULTAR_PACIENTE_ADULTO'), async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const paciente = await PacienteAdulto.findById(req.params.id);
+    const paciente = await Paciente.findById(req.params.id);
     if (!paciente) return res.status(404).json({ error: "No encontrado" });
-    res.json(paciente);
+
+    // Devolver con alias de compatibilidad
+    res.json({
+      ...paciente._doc,
+      cedula: paciente.numDocumentoIdentificacion,
+      genero: paciente.codSexo,
+      direccion: paciente.datosContacto?.direccion,
+      telefono: paciente.datosContacto?.telefono,
+      acompanante: paciente.datosContacto?.nombreAcompanante,
+      telefonoAcompanante: paciente.datosContacto?.telefonoAcompanante
+    });
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener paciente adulto" });
+    res.status(500).json({ error: "Error al obtener paciente" });
   }
 });
 
-// Actualizar paciente adulto por ID
-router.put("/:id", logAccesoAdultoMiddleware('ACTUALIZAR_PACIENTE_ADULTO'), async (req, res) => {
+// Actualizar paciente adulto
+router.put("/:id", async (req, res) => {
   try {
-    console.log("📝 Datos recibidos para actualización:", req.body);
+    const updateData = { ...req.body };
 
-    // Validar que el estadoEmbarazo sea válido si está presente
-    if (req.body.estadoEmbarazo && !['gestacion', 'posparto'].includes(req.body.estadoEmbarazo)) {
-      return res.status(400).json({ error: "Estado de embarazo inválido" });
-    }
+    if (req.body.cedula) updateData.numDocumentoIdentificacion = req.body.cedula;
 
-    const actualizado = await PacienteAdulto.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const actualizado = await Paciente.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!actualizado) return res.status(404).json({ mensaje: "No encontrado" });
 
-    if (!actualizado) {
-      return res.status(404).json({ mensaje: "Paciente adulto no encontrado" });
-    }
-
-    console.log("✅ Paciente adulto actualizado:", actualizado._id);
-    res.json({ mensaje: "Paciente adulto actualizado correctamente", paciente: actualizado });
+    res.json({ mensaje: "Actualizado correctamente", paciente: actualizado });
   } catch (error) {
-    console.error("❌ Error al actualizar paciente adulto:", error);
-    res.status(500).json({ mensaje: "Error al actualizar paciente adulto", error: error.message });
+    res.status(500).json({ mensaje: "Error al actualizar", error: error.message });
   }
 });
 
-// Eliminar paciente adulto por ID
-router.delete("/:id", logAccesoAdultoMiddleware('ELIMINAR_PACIENTE_ADULTO'), async (req, res) => {
+// Eliminar paciente adulto
+router.delete("/:id", async (req, res) => {
   try {
-    await PacienteAdulto.findByIdAndDelete(req.params.id);
-    res.json({ mensaje: "Paciente adulto eliminado correctamente" });
+    await Paciente.findByIdAndDelete(req.params.id);
+    res.json({ mensaje: "Eliminado correctamente" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

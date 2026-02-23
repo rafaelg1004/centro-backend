@@ -33,8 +33,8 @@ class FHIRMapper {
   createComposition(patientId, practitionerId, encounterId, type = "patient-summary") {
     const title = type === "patient-summary" ? "Resumen Digital de Atención - Paciente" : "Resumen Digital de Atención - Consulta Externa";
     // Code system for Loinc (Example)
-    const typeCode = type === "patient-summary" ? "60591-5" : "34133-9"; 
-    
+    const typeCode = type === "patient-summary" ? "60591-5" : "34133-9";
+
     return {
       resourceType: "Composition",
       id: uuidv4(),
@@ -66,7 +66,7 @@ class FHIRMapper {
     const p = pacienteData;
     const documentType = p.tipoDocumento || (p.cedula ? 'CC' : 'TI'); // Fallback logic
     const names = p.nombres ? p.nombres.split(' ') : ['Sin', 'Nombre'];
-    
+
     return {
       resourceType: "Patient",
       id: p._id.toString(),
@@ -251,9 +251,31 @@ class FHIRMapper {
       status: "completed",
       patient: { reference: `Patient/${patientId}` },
       relationship: {
-        text: "Family Member" 
+        text: "Family Member"
       },
       note: [{ text: text }]
+    };
+  }
+
+  /**
+   * Creates a Procedure resource (CUPS)
+   */
+  createProcedure(text, cupsCode, patientId, encounterId) {
+    return {
+      resourceType: "Procedure",
+      id: uuidv4(),
+      status: "completed",
+      code: {
+        coding: [{
+          system: "http://minsalud.gov.co/cups",
+          code: cupsCode || "931000",
+          display: text
+        }],
+        text: text
+      },
+      subject: { reference: `Patient/${patientId}` },
+      encounter: encounterId ? { reference: `Encounter/${encounterId}` } : undefined,
+      performedDateTime: new Date().toISOString()
     };
   }
 

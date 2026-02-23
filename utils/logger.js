@@ -92,6 +92,23 @@ class Logger {
   }
 
   /**
+   * Middleware de Auditoría - Filtra qué eventos registrar en BD
+   */
+  auditMiddleware() {
+    return (req, res, next) => {
+      // Solo registrar operaciones de modificación (POST, PUT, DELETE) y login
+      const shouldLog = ['POST', 'PUT', 'DELETE'].includes(req.method) ||
+        req.path.includes('/auth/login') ||
+        req.path.includes('/auth/verify-2fa-login');
+
+      if (shouldLog) {
+        return this.middleware()(req, res, next);
+      }
+      next();
+    };
+  }
+
+  /**
    * Middleware para Express que añade logging automático
    */
   middleware() {
@@ -102,36 +119,34 @@ class Logger {
       const logData = {
         ip: req.ip || req.connection.remoteAddress,
         userAgent: req.get('User-Agent') || '',
-        user: req.user?.username || req.body?.username || 'desconocido'
+        user: req.usuario?.usuario || req.body?.usuario || req.body?.username || 'desconocido'
       };
 
-      // Log del acceso
+      // Log del acceso inicial (opcional, podrías solo loggear al final)
       this.info('API', `ACCESO_${req.method}`, {
         ...logData,
         details: {
-          path: req.path,
-          method: req.method,
-          query: req.query,
-          body: req.method !== 'GET' ? req.body : undefined
+          path: req.originalUrl,
+          method: req.method
         }
       });
 
-      // Interceptar respuesta para log de tiempo
-      const originalSend = res.send;
-      res.send = function(data) {
+      // Interceptor de respuesta para loggear resultado final
+      const originalJson = res.json;
+      res.json = function (data) {
         const duration = Date.now() - startTime;
 
         logger.info('API', `RESPUESTA_${req.method}`, {
           ...logData,
           details: {
-            path: req.path,
+            path: req.originalUrl,
             statusCode: res.statusCode,
             duration: `${duration}ms`,
-            responseSize: data ? data.length : 0
+            response: res.statusCode >= 400 ? data : undefined // Solo loggear error bodies
           }
         });
 
-        originalSend.call(this, data);
+        return originalJson.call(this, data);
       };
 
       next();
