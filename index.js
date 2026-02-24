@@ -19,11 +19,6 @@ app.use(logger.auditMiddleware());
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('✅ Conectado a MongoDB Atlas');
-
-    // Ejecutar Seed de CUPS para asegurar consistencia en RIPS
-    const seedCUPS = require('./seeds/cupsSeed');
-    await seedCUPS();
-
   })
   .catch(err => console.error('❌ Error fatal en base de datos:', err));
 
@@ -39,16 +34,15 @@ app.get('/api/health', (req, res) => res.redirect('/api/system/health'));
 // === Rutas Protegidas (Requieren Token JWT) ===
 const { verificarToken } = require("./routes/auth");
 
-// Pacientes y Registros (Incluye alias /registro y /registros)
+// Pacientes y Registros (Unificados)
 app.use('/api/pacientes', verificarToken(), require('./routes/pacientes'));
-app.use('/api', verificarToken(), require('./routes/pacientes')); // Para soportar /api/registro y /api/registros
+app.use('/api/pacientes-adultos', verificarToken(), require('./routes/pacientes'));
 
-// Módulos Médicos y Valoraciones
-app.use('/api/pacientes-adultos', verificarToken(), require('./routes/pacientesAdultos'));
+// Módulos Médicos y Valoraciones (Unificados bajo /valoraciones)
 app.use('/api/valoraciones', verificarToken(), require('./routes/valoraciones'));
-app.use('/api/valoracion-ingreso-adultos-lactancia', verificarToken(), require('./routes/valoracionIngresoAdultosLactancia'));
+app.use('/api/valoracion-ingreso-adultos-lactancia', verificarToken(), require('./routes/valoraciones'));
 app.use('/api/consentimiento-perinatal', verificarToken(), require('./routes/consentimientoPerinatal'));
-app.use('/api/valoracion-piso-pelvico', verificarToken(), require('./routes/valoracionPisoPelvico'));
+app.use('/api/valoracion-piso-pelvico', verificarToken(), require('./routes/valoraciones'));
 
 // Academia y Pagos
 app.use('/api/clases', verificarToken(), require('./routes/clases'));
@@ -58,8 +52,9 @@ app.use('/api/sesiones-mensuales', verificarToken(), require('./routes/sesionesM
 // Sesiones Perinatales (Evoluciones)
 app.use('/api/sesiones-perinatal', verificarToken(), require('./routes/sesiones-perinatal'));
 
-// Alias de URL para compatibilidad con frontend (consentimientos-perinatales -> consentimiento-perinatal)
+// Alias de URL para compatibilidad con frontend (Tablas Dinámicas usan plural)
 app.use('/api/consentimientos-perinatales', verificarToken(), require('./routes/consentimientoPerinatal'));
+app.use('/api/valoraciones-piso-pelvico', verificarToken(), require('./routes/valoraciones'));
 
 // Reportes y Exportación
 app.use('/api', verificarToken(), require('./routes/exportarWord'));

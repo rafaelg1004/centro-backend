@@ -142,6 +142,31 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
 });
 
 /**
+ * @route   GET /api/valoraciones/verificar/:pacienteId
+ * @desc    Check if patient already has a valuation
+ */
+router.get('/verificar/:pacienteId', async (req, res) => {
+  try {
+    const valoracion = await ValoracionFisioterapia.findOne({ paciente: req.params.pacienteId }).sort({ fechaInicioAtencion: -1 });
+    if (valoracion) {
+      res.json({
+        tieneValoracion: true,
+        valoracion: {
+          id: valoracion._id,
+          fecha: valoracion.fechaInicioAtencion,
+          motivoDeConsulta: valoracion.motivoConsulta || 'No especificado'
+        }
+      });
+    } else {
+      res.json({ tieneValoracion: false });
+    }
+  } catch (error) {
+    console.error("Error validando valoración previa:", error);
+    res.status(500).json({ mensaje: 'Error al verificar valoración', error: error.message });
+  }
+});
+
+/**
  * @route   GET /api/valoraciones/paciente/:pacienteId
  * @desc    Obtener todas las valoraciones de un paciente (Cualquier tipo)
  */

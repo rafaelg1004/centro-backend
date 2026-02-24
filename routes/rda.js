@@ -18,25 +18,14 @@ const authenticate = (req, res, next) => {
 router.get('/patient/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    let paciente = await Paciente.findById(id);
-    let isAdult = false;
-
-    if (!paciente) {
-      paciente = await PacienteAdulto.findById(id);
-      isAdult = true;
-    }
+    const paciente = await Paciente.findById(id);
 
     if (!paciente) {
       return res.status(404).json({ success: false, message: 'Paciente no encontrado' });
     }
 
     // Buscar la última valoración para obtener antecedentes actualizados
-    let ultimaValoracion;
-    if (isAdult) {
-      ultimaValoracion = await ValoracionPisoPelvico.findOne({ paciente: id }).sort({ createdAt: -1 });
-    } else {
-      ultimaValoracion = await ValoracionIngreso.findOne({ paciente: id }).sort({ createdAt: -1 });
-    }
+    const ultimaValoracion = await ValoracionFisioterapia.findOne({ paciente: id }).sort({ createdAt: -1 });
 
     // --- Construcción del Bundle FHIR ---
     const entries = [];
@@ -57,7 +46,7 @@ router.get('/patient/:id', authenticate, async (req, res) => {
     // 4. Clinical Data (From Valuation)
     if (ultimaValoracion) {
       // Alergias
-      const alergiasText = isAdult ? ultimaValoracion.alergias : ultimaValoracion.toxicos;
+      const alergiasText = ultimaValoracion.antecedentes?.alergias || "Ninguna";
       const allergyRes = fhirMapper.createAllergyIntolerance(alergiasText, id);
       if (allergyRes) {
         entries.push({ resource: allergyRes });
@@ -65,7 +54,7 @@ router.get('/patient/:id', authenticate, async (req, res) => {
       }
 
       // Medicamentos
-      const medsText = isAdult ? ultimaValoracion.infoMedicacion : ultimaValoracion.farmacologicos;
+      const medsText = ultimaValoracion.antecedentes?.farmacologicos || "Ninguno";
       const medRes = fhirMapper.createMedicationStatement(medsText, id);
       if (medRes) {
         entries.push({ resource: medRes });
@@ -73,19 +62,21 @@ router.get('/patient/:id', authenticate, async (req, res) => {
       }
 
       // Problemas / Antecedentes
-      const patologicosText = isAdult ? ultimaValoracion.patologiaCardio : ultimaValoracion.patologicos;
+      const patologicosText = ultimaValoracion.antecedentes?.patologicos || "Sin antecedentes";
       const condRes = fhirMapper.createCondition(patologicosText, id, 'problem-list-item');
       if (condRes) {
         entries.push({ resource: condRes });
         addToSection(composition, "Problemas Activos", condRes.id, "11450-4", "Condition");
       }
 
-      // Antecedentes Familiares
-      const famText = ultimaValoracion.familiares;
-      const famRes = fhirMapper.createFamilyMemberHistory(famText, id);
-      if (famRes) {
-        entries.push({ resource: famRes });
-        addToSection(composition, "Antecedentes Familiares", famRes.id, "10157-6", "FamilyMemberHistory");
+      // Antecedentes Familiares (Fallback a _datosLegacy si no está en esquema)
+      const famText = ultimaValoracion.familiares || ultimaValoracion._datosLegacy?.familiares || "";
+      if (famText) {
+        const famRes = fhirMapper.createFamilyMemberHistory(famText, id);
+        if (famRes) {
+          entries.push({ resource: famRes });
+          addToSection(composition, "Antecedentes Familiares", famRes.id, "10157-6", "FamilyMemberHistory");
+        }
       }
     }
 
@@ -109,22 +100,14 @@ router.get('/patient/:id', authenticate, async (req, res) => {
 router.get('/encounter/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { type } = req.query; // 'adulto' or 'nino'
 
-    let valoracion;
-    let paciente;
-
-    if (type === 'adulto') {
-      valoracion = await ValoracionPisoPelvico.findById(id).populate('paciente');
-    } else {
-      valoracion = await ValoracionIngreso.findById(id).populate('paciente');
-    }
+    const valoracion = await ValoracionFisioterapia.findById(id).populate('paciente');
 
     if (!valoracion) {
       return res.status(404).json({ success: false, message: 'Valoración no encontrada' });
     }
 
-    paciente = valoracion.paciente;
+    const paciente = valoracion.paciente;
     const patientId = paciente._id.toString();
 
     // --- Construcción del Bundle ---

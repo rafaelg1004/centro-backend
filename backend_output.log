@@ -1,0 +1,584 @@
+­ƒÜÇ Servidor activo en puerto 5000
+Ô£à Conectado a MongoDB Atlas
+­ƒôï [2026-02-24T01:20:44.522Z] INFO [API]: ACCESO_POST - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { path: '/api/auth/login', method: 'POST' }
+­ƒôï [2026-02-24T01:20:44.739Z] INFO [AUTH]: LOGIN_EXITOSO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { mensaje: 'Login exitoso - primera fase', rol: 'administracion' }
+­ƒôï [2026-02-24T01:20:44.743Z] INFO [AUTH]: LOGIN_COMPLETADO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { mensaje: 'Login completado sin 2FA', rol: 'administracion' }
+­ƒôï [2026-02-24T01:20:44.744Z] INFO [API]: RESPUESTA_POST - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  path: '/api/auth/login',
+  statusCode: 200,
+  duration: '223ms',
+  response: undefined
+}
+­ƒôï [2026-02-24T01:20:44.751Z] INFO [API]: ACCESO_POST - Usuario: desconocido - Paciente: desconocido - Valoraci├│n: desconocido { path: '/api/rips/generate', method: 'POST' }
+­ƒôï [2026-02-24T01:20:44.753Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:20:44.753Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:20:44.754Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:20:44.754Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï Generando RIPS para: {
+  numFactura: 'TEST-001',
+  pacienteIds: [],
+  fechaInicio: '2025-01-01',
+  fechaFin: '2026-12-31'
+}
+­ƒöì Buscando pacientes din├ímicamente por servicios en el rango de fechas...
+Ô£à IDs encontrados din├ímicamente: 89
+­ƒöì Procesando 89 pacientes...
+­ƒôï CUPS cargados desde BD: 27 c├│digos
+­ƒôï [2026-02-24T01:21:11.323Z] INFO [API]: RESPUESTA_POST - Usuario: desconocido - Paciente: desconocido - Valoraci├│n: desconocido {
+  path: '/api/rips/generate',
+  statusCode: 200,
+  duration: '26572ms',
+  response: undefined
+}
+­ƒôï [2026-02-24T01:21:40.309Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/config',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:40.310Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/config',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:40.310Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/config',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:40.311Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/config',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:40.314Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:21:40.825Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes-adultos',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:46.809Z] INFO [API]: ACCESO_POST - Usuario: desconocido - Paciente: desconocido - Valoraci├│n: desconocido { path: '/api/rips/generate', method: 'POST' }
+­ƒôï [2026-02-24T01:21:46.810Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:46.811Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:46.812Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:21:46.813Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rips/generate',
+  metodo: 'POST',
+  rol: 'administracion'
+}
+­ƒôï Generando RIPS para: {
+  numFactura: '',
+  pacienteIds: [],
+  fechaInicio: '2026-01-01',
+  fechaFin: '2026-01-31'
+}
+­ƒöì Buscando pacientes din├ímicamente por servicios en el rango de fechas...
+Ô£à IDs encontrados din├ímicamente: 9
+­ƒöì Procesando 9 pacientes...
+­ƒôï [2026-02-24T01:21:52.223Z] INFO [API]: RESPUESTA_POST - Usuario: desconocido - Paciente: desconocido - Valoraci├│n: desconocido {
+  path: '/api/rips/generate',
+  statusCode: 200,
+  duration: '5414ms',
+  response: undefined
+}
+­ƒôï [2026-02-24T01:23:25.524Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:23:27.427Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd18c3cc772cf77fc0c2 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:23:27.432Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:27.506Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:29.263Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:29.264Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:29.265Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:29.265Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+Error generando RDA Paciente: ReferenceError: ValoracionIngreso is not defined
+    at C:\Users\Mi PC\Documents\proyecto_dmamitas\Backend\routes\rda.js:38:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+­ƒôï [2026-02-24T01:23:40.428Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:40.430Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:40.430Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:23:40.430Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/rda/patient/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+Error generando RDA Paciente: ReferenceError: ValoracionIngreso is not defined
+    at C:\Users\Mi PC\Documents\proyecto_dmamitas\Backend\routes\rda.js:38:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+­ƒôï [2026-02-24T01:25:57.293Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:26:01.600Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd18c3cc772cf77fc0c2 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:26:01.605Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:26:01.759Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:26:15.560Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones?limite=500',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:26:15.564Z] INFO [VALORACION]: LISTAR_VALORACIONES - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: multiple { metodo: 'GET', endpoint: '/api/valoraciones?limite=500' }
+­ƒôï [2026-02-24T01:31:06.784Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:31:20.724Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd31c3cc772cf77fc1f4',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd31c3cc772cf77fc1f4 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:31:21.029Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd31c3cc772cf77fc1f4',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:31:21.032Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd31c3cc772cf77fc1f4',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:31:27.034Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:31:28.963Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes-adultos',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:33:04.616Z] INFO [AUTH]: ACCESO_SIN_TOKEN - Usuario: desconocido - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Intento de acceso sin token de autenticaci├│n',
+  endpoint: '/api/pacientes',
+  metodo: 'GET'
+}
+­ƒôï [2026-02-24T01:34:13.161Z] INFO [API]: ACCESO_POST - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { path: '/api/auth/login', method: 'POST' }
+­ƒôï [2026-02-24T01:34:13.438Z] INFO [AUTH]: LOGIN_EXITOSO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { mensaje: 'Login exitoso - primera fase', rol: 'administracion' }
+­ƒôï [2026-02-24T01:34:13.440Z] INFO [AUTH]: LOGIN_COMPLETADO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido { mensaje: 'Login completado sin 2FA', rol: 'administracion' }
+­ƒôï [2026-02-24T01:34:13.440Z] INFO [API]: RESPUESTA_POST - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  path: '/api/auth/login',
+  statusCode: 200,
+  duration: '279ms',
+  response: undefined
+}
+­ƒôï [2026-02-24T01:34:14.690Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:34:25.395Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:34:46.760Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:34:46.762Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:34:46.764Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:34:46.766Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd18c3cc772cf77fc0c2 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:35:37.188Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd18c3cc772cf77fc0c2 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:35:37.305Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:37.405Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:37.496Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:42.325Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd18c3cc772cf77fc0c2 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:35:42.332Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:42.336Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:42.339Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd18c3cc772cf77fc0c2',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:49.455Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:35:49.456Z] INFO [VALORACION]: LISTAR_VALORACIONES - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: multiple { metodo: 'GET', endpoint: '/api/valoraciones' }
+­ƒôï [2026-02-24T01:36:02.306Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:36:26.621Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:37:08.709Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:37:09.018Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:09.018Z] INFO [VALORACION]: LISTAR_VALORACIONES - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: multiple { metodo: 'GET', endpoint: '/api/valoraciones' }
+­ƒôï [2026-02-24T01:37:10.666Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:37:15.506Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases?page=1&limit=10',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:19.433Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:37:26.201Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd2bc3cc772cf77fc197',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd2bc3cc772cf77fc197 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:37:26.205Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd2bc3cc772cf77fc197',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:26.371Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd2bc3cc772cf77fc197',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:26.374Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd2bc3cc772cf77fc197',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:31.368Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/699ccd40c3cc772cf77fc2e5',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:31.369Z] INFO [VALORACION]: CONSULTAR_VALORACION - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: 699ccd40c3cc772cf77fc2e5 {
+  metodo: 'GET',
+  endpoint: '/api/valoraciones/699ccd40c3cc772cf77fc2e5'
+}
+­ƒôï [2026-02-24T01:37:44.963Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:44.963Z] INFO [VALORACION]: LISTAR_VALORACIONES - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: multiple { metodo: 'GET', endpoint: '/api/valoraciones' }
+­ƒôï [2026-02-24T01:37:50.203Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:50.204Z] INFO [VALORACION]: LISTAR_VALORACIONES - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: multiple { metodo: 'GET', endpoint: '/api/valoraciones' }
+­ƒôï [2026-02-24T01:37:53.982Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases?page=1&limit=10',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:55.325Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/699779dd92b1877231949823',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:37:58.776Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/buscar?q=r',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - BUSCAR_PACIENTES
+­ƒôï [2026-02-24T01:38:10.081Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases?page=1&limit=10',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:38:13.528Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES
+­ƒôï [2026-02-24T01:38:43.595Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd1dc3cc772cf77fc0e6 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:38:43.598Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:38:43.599Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:38:43.601Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:38:53.654Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd1dc3cc772cf77fc0e6 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:39:13.821Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: 699ccd1dc3cc772cf77fc0e6 - CONSULTAR_PACIENTE
+­ƒôï [2026-02-24T01:39:13.827Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pagoPaquete/por-nino/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:39:13.829Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/clases/paciente/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:39:13.834Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/valoraciones/paciente/699ccd1dc3cc772cf77fc0e6',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+­ƒôï [2026-02-24T01:39:17.433Z] INFO [AUTH]: ACCESO_PERMITIDO - Usuario: Administrador - Paciente: desconocido - Valoraci├│n: desconocido {
+  mensaje: 'Acceso permitido a endpoint protegido',
+  endpoint: '/api/pacientes',
+  metodo: 'GET',
+  rol: 'administracion'
+}
+├░┼©ÔÇ£ÔÇ╣ LOG PACIENTE [ACCESO_PACIENTE]: Administrador - Paciente: multiple - LISTAR_PACIENTES

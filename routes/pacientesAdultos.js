@@ -66,20 +66,36 @@ router.get("/", async (req, res) => {
     const pacientes = await Paciente.find({
       tipoDocumentoIdentificacion: { $in: ['CC', 'CE', 'PA'] }
     })
-      .select('nombres apellidos numDocumentoIdentificacion codSexo fechaNacimiento aseguradora')
+      .select('nombres apellidos numDocumentoIdentificacion codSexo fechaNacimiento aseguradora datosContacto createdAt')
       .sort({ nombres: 1 });
 
     // Mapeo de compatibilidad
-    const mapiado = pacientes.map(p => ({
-      _id: p._id,
-      nombres: `${p.nombres} ${p.apellidos}`.trim(),
-      cedula: p.numDocumentoIdentificacion,
-      genero: p.codSexo,
-      aseguradora: p.aseguradora,
-      createdAt: p.createdAt
-    }));
+    const mapiado = pacientes.map(p => {
+      // Calcular edad
+      let edad = 0;
+      if (p.fechaNacimiento) {
+        const hoy = new Date();
+        const nacimiento = new Date(p.fechaNacimiento);
+        edad = hoy.getFullYear() - nacimiento.getFullYear();
+        if (hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
+          edad--;
+        }
+      }
+
+      return {
+        ...p._doc,
+        nombres: `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'SIN NOMBRE',
+        cedula: p.numDocumentoIdentificacion,
+        genero: p.codSexo,
+        celular: p.datosContacto?.telefono || p.datosContacto?.telefonoAcompanante || "N/A",
+        edad: edad,
+        aseguradora: p.aseguradora,
+        createdAt: p.createdAt
+      };
+    });
     res.json(mapiado);
   } catch (error) {
+    console.error("Error obteniendo pacientes adultos:", error);
     res.status(500).json({ error: "Error al obtener pacientes" });
   }
 });

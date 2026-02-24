@@ -128,7 +128,7 @@ router.get("/", async (req, res) => {
 
     const total = await Clase.countDocuments(query);
     const clases = await Clase.find(query)
-      .populate("ninos.nino", "nombres registroCivil genero edad") // Solo campos básicos del niño
+      .populate("ninos.paciente", "nombres apellidos numDocumentoIdentificacion genero") // Solo campos básicos del niño
       .select("-ninos.firma") // Excluir firmas en el listado masivo
       .sort({ fecha: -1, _id: -1 })
       .skip(skip)
@@ -149,7 +149,7 @@ router.get("/", async (req, res) => {
 // Obtener una clase por ID
 router.get("/:id", async (req, res) => {
   try {
-    const clase = await Clase.findById(req.params.id).populate("ninos.nino");
+    const clase = await Clase.findById(req.params.id).populate("ninos.paciente");
     if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
     res.json(clase);
   } catch (e) {

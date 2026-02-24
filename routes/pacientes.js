@@ -103,45 +103,107 @@ router.post("/", async (req, res) => {
 
 router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
   try {
-    const pacientes = await Paciente.find()
-      .select('nombres apellidos numDocumentoIdentificacion codSexo fechaNacimiento aseguradora')
+    const { tipo } = req.query;
+    let query = {};
+
+    if (tipo === 'nino') {
+      query.tipoDocumentoIdentificacion = { $in: ['RC', 'TI', 'MS', 'AS', 'CD', 'CN', 'SC'] };
+    } else if (tipo === 'adulto') {
+      query.tipoDocumentoIdentificacion = { $in: ['CC', 'CE', 'PA', 'PE'] };
+    }
+
+    const pacientes = await Paciente.find(query)
+      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora datosContacto createdAt')
       .sort({ nombres: 1 });
 
-    // Mapeo de compatibilidad para el frontend que espera campos antiguos
-    const mapiado = pacientes.map(p => ({
-      ...p._doc,
-      registroCivil: p.numDocumentoIdentificacion, // Alias legacy
-      cedula: p.numDocumentoIdentificacion, // Alias legacy
-      genero: p.codSexo, // Alias legacy
-      nombres: `${p.nombres} ${p.apellidos}`.trim()
-    }));
+    const mapiado = pacientes.map(p => {
+      let edad = 0;
+      if (p.fechaNacimiento) {
+        const hoy = new Date();
+        const nacimiento = new Date(p.fechaNacimiento);
+
+        // Si es niño (RC/TI), calcular edad en meses para el frontend legacy
+        const esNino = ['RC', 'TI', 'CN'].includes(p.tipoDocumentoIdentificacion);
+        if (esNino) {
+          edad = (hoy.getFullYear() - nacimiento.getFullYear()) * 12 + (hoy.getMonth() - nacimiento.getMonth());
+        } else {
+          // Si es adulto, edad en años
+          edad = hoy.getFullYear() - nacimiento.getFullYear();
+          if (hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
+            edad--;
+          }
+        }
+      }
+
+      return {
+        ...p._doc,
+        nombres: `${p.nombres || ''} ${p.apellidos || ''}`.trim(),
+        registroCivil: p.numDocumentoIdentificacion, // Alias legacy
+        cedula: p.numDocumentoIdentificacion, // Alias legacy
+        genero: p.codSexo,
+        edad: edad,
+        celular: p.datosContacto?.telefono || p.datosContacto?.telefonoAcompanante || "N/A",
+        nombreMadre: p.datosContacto?.nombreAcompanante || "N/A",
+        nombrePadre: "N/A"
+      };
+    });
 
     res.json(mapiado);
   } catch (error) {
+    console.error("Error en LISTAR_PACIENTES:", error);
     res.status(500).json({ error: "Error al obtener pacientes" });
   }
 });
 
 router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) => {
-  const { q } = req.query;
+  const { q, tipo } = req.query;
   try {
     if (!q || q.trim() === "") {
       return res.json([]);
     }
-    const pacientes = await Paciente.find({
+
+    let query = {
       $or: [
         { nombres: { $regex: q, $options: "i" } },
         { apellidos: { $regex: q, $options: "i" } },
         { numDocumentoIdentificacion: { $regex: q, $options: "i" } }
       ]
-    }).sort({ nombres: 1 }).limit(20);
+    };
 
-    const mapiado = pacientes.map(p => ({
-      ...p._doc,
-      registroCivil: p.numDocumentoIdentificacion,
-      cedula: p.numDocumentoIdentificacion,
-      nombres: `${p.nombres} ${p.apellidos}`.trim()
-    }));
+    if (tipo === 'nino') {
+      query.tipoDocumentoIdentificacion = { $in: ['RC', 'TI', 'MS', 'AS', 'CD', 'CN', 'SC'] };
+    } else if (tipo === 'adulto') {
+      query.tipoDocumentoIdentificacion = { $in: ['CC', 'CE', 'PA', 'PE'] };
+    }
+
+    const pacientes = await Paciente.find(query).sort({ nombres: 1 }).limit(20);
+
+    const mapiado = pacientes.map(p => {
+      let edad = 0;
+      if (p.fechaNacimiento) {
+        const hoy = new Date();
+        const nacimiento = new Date(p.fechaNacimiento);
+        const esNino = ['RC', 'TI', 'CN'].includes(p.tipoDocumentoIdentificacion);
+        if (esNino) {
+          edad = (hoy.getFullYear() - nacimiento.getFullYear()) * 12 + (hoy.getMonth() - nacimiento.getMonth());
+        } else {
+          edad = hoy.getFullYear() - nacimiento.getFullYear();
+          if (hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
+            edad--;
+          }
+        }
+      }
+
+      return {
+        ...p._doc,
+        nombres: `${p.nombres || ''} ${p.apellidos || ''}`.trim(),
+        registroCivil: p.numDocumentoIdentificacion,
+        cedula: p.numDocumentoIdentificacion,
+        genero: p.codSexo,
+        edad: edad,
+        celular: p.datosContacto?.telefono || p.datosContacto?.telefonoAcompanante || "N/A"
+      };
+    });
 
     res.json(mapiado);
   } catch (e) {

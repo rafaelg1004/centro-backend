@@ -10,10 +10,8 @@ const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
 const EvolucionSesion = require('../models/EvolucionSesion');
 const Clase = require('../models/Clase');
 
-
-// Middleware de autenticación (simplificado)
+// Middleware de autenticación (ya viene manejado desde index.js con verificarToken, pero mantenemos referencia por si se usa req.user)
 const authenticate = (req, res, next) => {
-  // TODO: Implementar autenticación real
   next();
 };
 
@@ -42,33 +40,35 @@ router.post('/generate', authenticate, async (req, res) => {
     if (!idsParaProcesar.length && (fechaInicio || fechaFin)) {
       console.log('🔍 Buscando pacientes dinámicamente por servicios en el rango de fechas...');
 
-      const fechaQuery = {
-        ...(fechaInicio || fechaFin ? {
-          fecha: {
-            ...(fechaInicio && { $gte: fechaInicio }),
-            ...(fechaFin && { $lte: fechaFin })
-          }
-        } : {})
+      const rangeQuery = {
+        ...(fechaInicio && { $gte: new Date(fechaInicio) }),
+        ...(fechaFin && { $lte: new Date(fechaFin) })
       };
 
+      const fechaQueryAtencion = Object.keys(rangeQuery).length > 0 ? { fechaInicioAtencion: rangeQuery } : {};
+
+      // Para Clase, la fecha es string AAAA-MM-DD
+      const rangeQueryString = {
+        ...(fechaInicio && { $gte: fechaInicio }),
+        ...(fechaFin && { $lte: fechaFin })
+      };
+      const fechaQueryClase = Object.keys(rangeQueryString).length > 0 ? { fecha: rangeQueryString } : {};
+
       const [
-        valoracionesNinos,
+        valoraciones,
         clases,
-        sesionesAdultos,
-        valoracionesAdultos
+        evoluciones
       ] = await Promise.all([
-        ValoracionIngreso.find(fechaQuery).select('paciente').lean(),
-        Clase.find(fechaQuery).select('ninos.paciente').lean(),
-        SesionPerinatalPaciente.find(fechaQuery).select('paciente').lean(),
-        ValoracionPisoPelvico.find(fechaQuery).select('paciente').lean()
+        ValoracionFisioterapia.find(fechaQueryAtencion).select('paciente').lean(),
+        Clase.find(fechaQueryClase).select('ninos.paciente').lean(),
+        EvolucionSesion.find(fechaQueryAtencion).select('paciente').lean()
       ]);
 
       const idsEncontrados = new Set();
 
-      valoracionesNinos.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
+      valoraciones.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
       clases.forEach(c => c.ninos.forEach(n => n.paciente && idsEncontrados.add(n.paciente.toString())));
-      sesionesAdultos.forEach(s => s.paciente && idsEncontrados.add(s.paciente.toString()));
-      valoracionesAdultos.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
+      evoluciones.forEach(s => s.paciente && idsEncontrados.add(s.paciente.toString()));
 
       idsParaProcesar = Array.from(idsEncontrados);
       console.log(`✅ IDs encontrados dinámicamente: ${idsParaProcesar.length}`);
@@ -81,12 +81,9 @@ router.post('/generate', authenticate, async (req, res) => {
       });
     }
 
-    // Obtener pacientes de ambas colecciones
+    // Obtener pacientes (Todos están en la colección Paciente)
     const query = { _id: { $in: idsParaProcesar } };
-    const pacientesNinos = await Paciente.find(query);
-    const pacientesAdultos = await PacienteAdulto.find(query);
-
-    const pacientes = [...pacientesNinos, ...pacientesAdultos];
+    const pacientes = await Paciente.find(query);
 
     console.log(`🔍 Procesando ${pacientes.length} pacientes...`);
 
@@ -99,136 +96,81 @@ router.post('/generate', authenticate, async (req, res) => {
 
     for (let i = 0; i < pacientes.length; i++) {
       const paciente = pacientes[i];
+      const isKid = ['RC', 'TI', 'CN'].includes(paciente.tipoDocumentoIdentificacion);
 
-      // Obtener valoraciones de ingreso (solo para pacientes niños)
-      let valoracionesIngreso = [];
-      if (paciente.constructor.modelName === 'Paciente') {
-        valoracionesIngreso = await ValoracionIngreso.find({
-          paciente: paciente._id,
-          ...(fechaInicio || fechaFin ? {
-            fecha: {
-              ...(fechaInicio && { $gte: fechaInicio }),
-              ...(fechaFin && { $lte: fechaFin })
-            }
-          } : {})
-        }).setOptions({ strictPopulate: false });
-      }
+      const rangeQuery = {
+        ...(fechaInicio && { $gte: new Date(fechaInicio) }),
+        ...(fechaFin && { $lte: new Date(fechaFin) })
+      };
+      const fechaQueryAtencion = Object.keys(rangeQuery).length > 0 ? { fechaInicioAtencion: rangeQuery } : {};
 
-      // Obtener clases asistidas (solo para pacientes niños)
-      let clases = [];
-      if (paciente.constructor.modelName === 'Paciente') {
-        clases = await Clase.find({
-          'ninos.paciente': paciente._id,
-          'ninos.asistio': true,
-          ...(fechaInicio || fechaFin ? {
-            fecha: {
-              ...(fechaInicio && { $gte: fechaInicio }),
-              ...(fechaFin && { $lte: fechaFin })
-            }
-          } : {})
-        }).setOptions({ strictPopulate: false });
-      }
+      // Obtener valoraciones
+      const valoraciones = await ValoracionFisioterapia.find({
+        paciente: paciente._id,
+        ...fechaQueryAtencion
+      }).setOptions({ strictPopulate: false });
 
-      // Obtener sesiones perinatales (solo para pacientes adultos)
-      let sesionesPerinatales = [];
-      if (paciente.constructor.modelName === 'PacienteAdulto') {
-        sesionesPerinatales = await SesionPerinatalPaciente.find({
-          paciente: paciente._id,
-          ...(fechaInicio || fechaFin ? {
-            fecha: {
-              ...(fechaInicio && { $gte: fechaInicio }),
-              ...(fechaFin && { $lte: fechaFin })
-            }
-          } : {})
-        }).setOptions({ strictPopulate: false });
-      }
+      // Obtener clases asistidas
+      const rangeQueryString = {
+        ...(fechaInicio && { $gte: fechaInicio }),
+        ...(fechaFin && { $lte: fechaFin })
+      };
+      const fechaQueryClase = Object.keys(rangeQueryString).length > 0 ? { fecha: rangeQueryString } : {};
 
-      // Obtener valoraciones de piso pélvico (solo para pacientes adultos)
-      let valoracionesPisoPelvico = [];
-      if (paciente.constructor.modelName === 'PacienteAdulto') {
-        valoracionesPisoPelvico = await ValoracionPisoPelvico.find({
-          paciente: paciente._id,
-          ...(fechaInicio || fechaFin ? {
-            fecha: {
-              ...(fechaInicio && { $gte: fechaInicio }),
-              ...(fechaFin && { $lte: fechaFin })
-            }
-          } : {})
-        }).setOptions({ strictPopulate: false });
-      }
+      const clasesAsistidas = await Clase.find({
+        'ninos.paciente': paciente._id,
+        // 'ninos.asistio': true, // Nota: el modelo Clase actual no parece tener asistio, sino solo presencia en la lista
+        ...fechaQueryClase
+      }).setOptions({ strictPopulate: false });
+
+      // Obtener evoluciones/sesiones
+      const sesiones = await EvolucionSesion.find({
+        paciente: paciente._id,
+        ...fechaQueryAtencion
+      }).setOptions({ strictPopulate: false });
 
       // 🛑 FILTRO IMPORTANTE: Si el paciente no tiene servicios en este rango, NO incluirlo
-      if (valoracionesIngreso.length === 0 &&
-        clases.length === 0 &&
-        sesionesPerinatales.length === 0 &&
-        valoracionesPisoPelvico.length === 0) {
-        // console.log(`⏩ Saltando paciente ${paciente.nombres || paciente.nombre} - Sin servicios en el rango`);
+      if (valoraciones.length === 0 && clasesAsistidas.length === 0 && sesiones.length === 0) {
         continue;
       }
 
-      // Mapear datos según el tipo de paciente
-      let pacienteData;
-      if (paciente.constructor.modelName === 'Paciente') {
-        // Paciente niño
-        pacienteData = {
-          paciente: {
-            nombres: paciente.nombres || '',
-            apellidos: paciente.apellidos || '',
-            tipoDocumento: paciente.tipoDocumento || 'RC',
-            numeroDocumento: paciente.numeroDocumento || paciente.registroCivil || '',
-            fechaNacimiento: paciente.fechaNacimiento,
-            genero: paciente.genero || 'Masculino',
-            regimenAfiliacion: paciente.regimenAfiliacion || 'No asegurado',
-            codPaisResidencia: '170',
-            codMunicipioResidencia: '23001',
-            codZonaTerritorialResidencia: '01'
+      // Mapear datos unificados
+      const pacienteData = {
+        paciente: {
+          nombres: paciente.nombres || '',
+          apellidos: paciente.apellidos || '',
+          tipoDocumento: paciente.tipoDocumentoIdentificacion || (isKid ? 'RC' : 'CC'),
+          numeroDocumento: paciente.numDocumentoIdentificacion || '',
+          fechaNacimiento: paciente.fechaNacimiento,
+          genero: paciente.codSexo === 'M' ? 'Masculino' : 'Femenino',
+          regimenAfiliacion: paciente.tipoUsuario === '04' ? 'No asegurado' : 'Contributivo',
+          codPaisResidencia: paciente.codPaisResidencia || '170',
+          codMunicipioResidencia: paciente.codMunicipioResidencia || '23001',
+          codZonaTerritorialResidencia: paciente.codZonaTerritorialResidencia || '01'
+        },
+        valoracionesIngreso: valoraciones.map(v => ({
+          fecha: v.fechaInicioAtencion,
+          motivoDeConsulta: v.motivoConsulta,
+          profesionalTratante: {
+            nombre: v.firmas?.profesional?.nombre || 'Dayan Villegas',
+            numeroDocumento: v.firmas?.profesional?.registroMedico || '00000000'
           },
-          valoracionesIngreso: valoracionesIngreso.map(v => ({
-            fecha: v.fecha,
-            motivoDeConsulta: v.motivoDeConsulta,
-            profesionalTratante: v.profesionalTratante,
-            vrServicio: v.vrServicio || 0
-          })),
-          clases: clases.map(c => ({
-            fecha: c.fecha,
-            titulo: c.titulo,
-            instructor: c.instructor,
-            vrServicio: c.vrServicio || 0
-          })),
-          sesionesPerinatales: [],
-          consecutivo: converterData.pacientes.length + 1
-        };
-      } else {
-        // Paciente adulto
-        pacienteData = {
-          paciente: {
-            nombres: paciente.nombres || paciente.nombre || '',
-            apellidos: paciente.apellidos || '',
-            tipoDocumento: paciente.tipoDocumento || paciente.cedula ? 'CC' : 'TI',
-            numeroDocumento: paciente.numeroDocumento || paciente.cedula || '',
-            fechaNacimiento: paciente.fechaNacimiento,
-            genero: paciente.genero || paciente.sexo || 'Femenino',
-            regimenAfiliacion: paciente.regimenAfiliacion || 'No asegurado',
-            codPaisResidencia: '170',
-            codMunicipioResidencia: '23001',
-            codZonaTerritorialResidencia: '01'
-          },
-          valoracionesIngreso: [],
-          clases: [],
-          sesionesPerinatales: sesionesPerinatales.map(s => ({
-            fecha: s.fecha,
-            profesional: s.profesional,
-            vrServicio: s.vrServicio || 0
-          })),
-          valoracionesPisoPelvico: valoracionesPisoPelvico.map(v => ({
-            fecha: v.fecha,
-            motivoConsulta: v.motivoConsulta,
-            diagnosticoFisio: v.diagnosticoFisio,
-            vrServicio: v.vrServicio || 0
-          })),
-          consecutivo: converterData.pacientes.length + 1
-        };
-      }
+          vrServicio: v.vrServicio || 0
+        })),
+        clases: clasesAsistidas.map(c => ({
+          fecha: c.fecha,
+          titulo: c.nombre || 'Clase de Estimulación',
+          instructor: 'Dayan Villegas',
+          vrServicio: 0 // Las clases suelen estar en paquetes
+        })),
+        sesionesPerinatales: sesiones.map(s => ({
+          fecha: s.fechaInicioAtencion,
+          profesional: s.firmas?.profesional?.nombre || 'Dayan Villegas',
+          vrServicio: s.vrServicio || 0
+        })),
+        valoracionesPisoPelvico: [], // En el nuevo modelo, todas son valoracionesIngreso mapeadas arriba
+        consecutivo: converterData.pacientes.length + 1
+      };
 
       converterData.pacientes.push(pacienteData);
     }

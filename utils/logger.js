@@ -52,12 +52,17 @@ class Logger {
       return;
     }
 
+    let pacienteId = null;
+    if (data.paciente && /^[0-9a-fA-F]{24}$/.test(data.paciente)) {
+      pacienteId = data.paciente;
+    }
+
     const logData = {
       level,
       category,
       action,
       user: data.user || 'desconocido',
-      paciente: data.paciente || 'desconocido',
+      paciente: pacienteId,
       valoracion: data.valoracion || 'desconocido',
       details: data.details || {},
       ip: data.ip || '',
@@ -65,7 +70,7 @@ class Logger {
     };
 
     // Formato para consola
-    const consoleMessage = `[${new Date().toISOString()}] ${level} [${category}]: ${action} - Usuario: ${logData.user} - Paciente: ${logData.paciente} - Valoración: ${logData.valoracion}`;
+    const consoleMessage = `[${new Date().toISOString()}] ${level} [${category}]: ${action} - Usuario: ${logData.user} - Paciente: ${data.paciente || 'desconocido'} - Valoración: ${logData.valoracion}`;
 
     // Log en consola
     switch (level) {

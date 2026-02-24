@@ -17,7 +17,7 @@ const cupsData = [
         modalidad: '09'
     },
     {
-        codigo: '890264',
+        codigo: '890264-1',
         nombre: 'VALORACIÓN DE PISO PÉLVICO - PRIMERA VEZ',
         tipoServicio: 'consulta',
         categoria: 'pisoPelvico',
@@ -28,7 +28,7 @@ const cupsData = [
         modalidad: '09'
     },
     {
-        codigo: '890264',
+        codigo: '890264-2',
         nombre: 'VALORACIÓN DE LACTANCIA - PRIMERA VEZ',
         tipoServicio: 'consulta',
         categoria: 'lactancia',
@@ -85,7 +85,7 @@ const cupsData = [
         modalidad: '01'
     },
     {
-        codigo: '890384',
+        codigo: '890384-1',
         nombre: 'SESIÓN DE EDUCACIÓN PERINATAL (CONTROL)',
         tipoServicio: 'procedimiento',
         categoria: 'prenatal',
@@ -107,11 +107,18 @@ async function seedCUPS() {
         }
 
         for (const item of cupsData) {
-            await CodigoCUPS.findOneAndUpdate(
-                { claveInterna: item.claveInterna },
-                item,
-                { upsert: true, new: true }
-            );
+            try {
+                let existente = await CodigoCUPS.findOne({ claveInterna: item.claveInterna });
+                if (existente) {
+                    // Si el código va a cambiar y ya existe, o si hay un cambio simple de datos
+                    Object.assign(existente, item);
+                    await existente.save();
+                } else {
+                    await CodigoCUPS.create(item);
+                }
+            } catch (err) {
+                console.warn(`Aviso al insertar/actualizar CUPS ${item.claveInterna}: ${err.message}`);
+            }
         }
 
         console.log('✅ Seed de CUPS completado exitosamente.');
