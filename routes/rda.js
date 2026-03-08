@@ -127,7 +127,8 @@ router.get('/encounter/:id', authenticate, async (req, res) => {
 
     // 4. Diagnosis (Condition)
     const diagText = valoracion.diagnosticoFisioterapeutico || valoracion.diagnosticoFisio || "Evaluación Fisioterapéutica";
-    const conditionRes = fhirMapper.createCondition(diagText, patientId, 'encounter-diagnosis');
+    const cie10Code = valoracion.codDiagnosticoPrincipal || "Z348"; // Default para Perinatal temporal
+    const conditionRes = fhirMapper.createCondition(diagText, patientId, 'encounter-diagnosis', cie10Code);
     if (conditionRes) {
       entries.push({ resource: conditionRes });
       addToSection(composition, "Diagnóstico", conditionRes.id, "29548-5", "Condition");

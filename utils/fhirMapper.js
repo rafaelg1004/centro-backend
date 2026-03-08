@@ -94,7 +94,14 @@ class FHIRMapper {
         }
       ],
       gender: this.mapGender(p.genero),
-      birthDate: p.fechaNacimiento ? p.fechaNacimiento.split('T')[0] : undefined,
+      birthDate: (() => {
+        if (!p.fechaNacimiento) return undefined;
+        try {
+          return new Date(p.fechaNacimiento).toISOString().split('T')[0];
+        } catch (e) {
+          return undefined; // Evitar el fallo si la fecha es muy corrupta
+        }
+      })(),
       address: [{
         line: [p.direccion],
         city: p.codMunicipioResidencia || "Montería", // Fallback to name if code logic is complex
@@ -175,7 +182,7 @@ class FHIRMapper {
    * Maps Conditions (Antecedentes/Diagnósticos)
    * category: 'problem-list-item' or 'encounter-diagnosis'
    */
-  createCondition(text, patientId, category = 'problem-list-item') {
+  createCondition(text, patientId, category = 'problem-list-item', cie10Code = null) {
     if (!text || text === 'No' || text === 'Niega') return null;
 
     return {
@@ -194,6 +201,11 @@ class FHIRMapper {
         }]
       }],
       code: {
+        coding: cie10Code ? [{
+          system: "http://hl7.org/fhir/sid/icd-10", // Estándar CIE-10 exigido por MinSalud
+          code: cie10Code,
+          display: text
+        }] : undefined,
         text: text
       },
       subject: { reference: `Patient/${patientId}` }

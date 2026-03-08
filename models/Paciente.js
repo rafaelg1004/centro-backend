@@ -13,11 +13,35 @@ const PacienteSchema = new Schema({
   codMunicipioResidencia: { type: String }, // Código DANE, ej: '05134'
   codZonaTerritorialResidencia: { type: String, default: "01" }, // '01' Urbana, '02' Rural
   tipoUsuario: { type: String, default: "04" }, // '04' Particular, '01' Contributivo
+  esAdulto: { type: Boolean, default: false }, // Para facilitar filtros y lógica UI
 
-  // Datos Asistenciales Adicionales
+  // Datos Asistenciales Adicionales (Adultos y General)
   estadoCivil: { type: String },
   ocupacion: { type: String },
-  aseguradora: { type: String }, // Mantenido para lógica de negocio
+  nivelEducativo: { type: String },
+  aseguradora: { type: String },
+  medicoTratante: { type: String },
+  lugarNacimiento: { type: String },
+
+  // Datos Maternos / Materno-Perinatales
+  estadoEmbarazo: { type: String }, // 'gestacion' | 'posparto'
+  nombreBebe: { type: String },
+  fum: { type: String }, // Adultos/Materno
+  semanasGestacion: { type: String }, // Adultos/Materno
+  fechaProbableParto: { type: String }, // Adultos/Materno
+
+  // Datos Asistenciales Adicionales (Niños/Pediátrico)
+  nombreMadre: { type: String },
+  edadMadre: { type: String },
+  ocupacionMadre: { type: String },
+  nombrePadre: { type: String },
+  edadPadre: { type: String },
+  ocupacionPadre: { type: String },
+  pediatra: { type: String },
+  peso: { type: String },
+  talla: { type: String },
+
+
   datosContacto: {
     direccion: String,
     telefono: String,

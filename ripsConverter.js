@@ -19,6 +19,17 @@ class RIPSConverter {
   }
 
   /**
+   * Extrae el código puro de un string tipo "F840 - Descripción"
+   */
+  extractCIE10(val) {
+    if (!val) return null;
+    if (typeof val !== 'string') return val;
+    // Si contiene " - ", tomar solo la primera parte
+    const parts = val.split(' - ');
+    return parts[0].trim().toUpperCase();
+  }
+
+  /**
    * Carga los códigos CUPS desde la base de datos
    * Usa cache para evitar múltiples consultas
    */
@@ -274,19 +285,23 @@ class RIPSConverter {
   async convertConsulta(valoracion, pacienteData) {
     try {
       const tipoConsultaKey = this.determinarTipoConsulta(valoracion.motivoDeConsulta);
-      const finalidad = this.getFinalidadDinamica(tipoConsultaKey);
-      const diagnostico = this.determinarDiagnosticoCIE(valoracion.motivoDeConsulta);
+
+      // Priorizar datos reales guardados en la valoración sobre los defaults
+      const finalidad = valoracion.finalidad || this.getFinalidadDinamica(tipoConsultaKey);
+      const diagnostico = this.extractCIE10(valoracion.codDiagnosticoPrincipal) || this.determinarDiagnosticoCIE(valoracion.motivoDeConsulta);
+      const codConsulta = valoracion.codConsulta || this.getCodigoCUPSDinamico(tipoConsultaKey);
+      const causa = valoracion.causaExterna || ripsConfig.causasMotivoAtencion.consultaExterna;
 
       return {
         codPrestador: this.getCodigoPrestador(),
         fechalnicioAtencion: this.formatFechaRIPS(valoracion.fecha),
         numAutorizacion: valoracion.numAutorizacion || null,
-        codConsulta: this.getCodigoCUPSDinamico(tipoConsultaKey),
+        codConsulta: codConsulta,
         modalidadGrupoServicioTecSal: ripsConfig.modalidades.consultaExterna,
         grupoServicios: ripsConfig.gruposServicios.consultas,
-        codServicio: this.getCodigoServicioREPS(), 
+        codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
-        causaMotivoAtencion: ripsConfig.causasMotivoAtencion.consultaExterna,
+        causaMotivoAtencion: causa,
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado1: null,
         codDiagnosticoRelacionado2: null,
@@ -462,7 +477,7 @@ class RIPSConverter {
   determinarTipoConsulta(motivo) {
     // Según instrucciones: Todas las valoraciones apuntan a Consulta Fisiatría 1ra Vez ('890264')
     // Las de control o seguimiento usarían '890384'
-    return 'consultaFisiatriaPrimeraVez'; 
+    return 'consultaFisiatriaPrimeraVez';
   }
 
   /**
@@ -472,25 +487,25 @@ class RIPSConverter {
     if (!titulo) return 'terapiaFisicaSOD';
 
     const tituloLower = titulo.toLowerCase();
-    
+
     // Reglas específicas mapeadas a códigos Res. 2706
     if (tituloLower.includes('estimulación') || tituloLower.includes('clase') || tituloLower.includes('sensorial') || tituloLower.includes('grupal')) {
       return 'integracionSensorial'; // 933900
     }
-    
+
     if (tituloLower.includes('piso pélvico') || tituloLower.includes('piso pelvico')) {
       return 'rehabDeficienciaLeve'; // 938610 (Sesiones Rehab)
     }
-    
+
     if (tituloLower.includes('preparación parto') || tituloLower.includes('preparacion parto') || tituloLower.includes('educación')) {
       return 'consultaFisiatriaControl'; // 890384 (Educación/Control) - Si se factura como consulta
       // O 'rehabDeficienciaLeve' si es procedimiento
     }
-    
+
     if (tituloLower.includes('masaje')) {
       return 'terapiaFisicaSOD'; // 931000
     }
-    
+
     // Default
     return 'terapiaFisicaSOD';
   }
@@ -560,11 +575,11 @@ class RIPSConverter {
     if (!ripsData.numDocumentoldObligado) {
       this.validationErrors.push('RVG01: Falta información básica del obligado');
     }
-    
+
     if (!sinFactura && !ripsData.numFactura) {
       this.validationErrors.push('RVG01: Falta número de factura (obligatorio si no es reporte sin factura)');
     }
-    
+
     if (sinFactura && ripsData.numFactura !== null) {
       this.validationErrors.push('RVG01: Para reporte sin factura, numFactura debe ser null');
     }

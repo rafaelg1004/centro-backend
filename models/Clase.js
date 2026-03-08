@@ -6,7 +6,7 @@ const ClaseSchema = new mongoose.Schema({
   descripcion: String,
   ninos: [
     {
-      paciente: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
+      nino: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente" },
       firma: String,
       numeroFactura: String,
       auditTrail: { type: Object, default: {} } // Pista de auditoría para la firma del asistente

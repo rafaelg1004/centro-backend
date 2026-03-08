@@ -60,14 +60,14 @@ router.post('/generate', authenticate, async (req, res) => {
         evoluciones
       ] = await Promise.all([
         ValoracionFisioterapia.find(fechaQueryAtencion).select('paciente').lean(),
-        Clase.find(fechaQueryClase).select('ninos.paciente').lean(),
+        Clase.find(fechaQueryClase).select('ninos.nino').lean(),
         EvolucionSesion.find(fechaQueryAtencion).select('paciente').lean()
       ]);
 
       const idsEncontrados = new Set();
 
       valoraciones.forEach(v => v.paciente && idsEncontrados.add(v.paciente.toString()));
-      clases.forEach(c => c.ninos.forEach(n => n.paciente && idsEncontrados.add(n.paciente.toString())));
+      clases.forEach(c => c.ninos.forEach(n => n.nino && idsEncontrados.add(n.nino.toString())));
       evoluciones.forEach(s => s.paciente && idsEncontrados.add(s.paciente.toString()));
 
       idsParaProcesar = Array.from(idsEncontrados);
@@ -118,7 +118,7 @@ router.post('/generate', authenticate, async (req, res) => {
       const fechaQueryClase = Object.keys(rangeQueryString).length > 0 ? { fecha: rangeQueryString } : {};
 
       const clasesAsistidas = await Clase.find({
-        'ninos.paciente': paciente._id,
+        'ninos.nino': paciente._id,
         // 'ninos.asistio': true, // Nota: el modelo Clase actual no parece tener asistio, sino solo presencia en la lista
         ...fechaQueryClase
       }).setOptions({ strictPopulate: false });
@@ -151,6 +151,11 @@ router.post('/generate', authenticate, async (req, res) => {
         valoracionesIngreso: valoraciones.map(v => ({
           fecha: v.fechaInicioAtencion,
           motivoDeConsulta: v.motivoConsulta,
+          codDiagnosticoPrincipal: v.codDiagnosticoPrincipal,
+          finalidad: v.finalidad,
+          causaExterna: v.causa || v.causaExterna,
+          codConsulta: v.codConsulta,
+          numAutorizacion: v.numAutorizacion,
           profesionalTratante: {
             nombre: v.firmas?.profesional?.nombre || 'Dayan Villegas',
             numeroDocumento: v.firmas?.profesional?.registroMedico || '00000000'

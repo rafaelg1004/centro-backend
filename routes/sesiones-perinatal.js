@@ -75,11 +75,13 @@ router.put("/:id", async (req, res) => {
 
     const updateData = { ...req.body };
 
-    // Detectar nueva firma del paciente
-    if (req.body.firmaPaciente && req.body.firmaPaciente !== sesionActual.firmas?.paciente?.firmaUrl) {
+    // Detectar nueva firma del paciente o eliminación
+    if (req.body.firmaPaciente !== undefined && req.body.firmaPaciente !== sesionActual.firmas?.paciente?.firmaUrl) {
       updateData['firmas.paciente.firmaUrl'] = req.body.firmaPaciente;
-      updateData['firmas.paciente.timestamp'] = new Date();
-      updateData['firmas.paciente.ip'] = req.ip;
+      if (req.body.firmaPaciente) {
+        updateData['firmas.paciente.timestamp'] = new Date();
+        updateData['firmas.paciente.ip'] = req.ip;
+      }
     }
 
     // Sello de integridad

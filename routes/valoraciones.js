@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
+const EvolucionSesion = require('../models/EvolucionSesion');
 const { eliminarImagenesValoracion } = require('../utils/s3Utils');
 const logger = require('../utils/logger');
 const { verificarBloqueo } = require('../utils/hcMiddleware');
@@ -51,12 +52,90 @@ const validarImagenes = (req, res, next) => {
   next();
 };
 
+const generarSesionesPerinatales = (planRaw) => {
+  let sesiones = [];
+  let sesionesIntensivo = [];
+
+  const plan = String(planRaw || "").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  if (plan === 'educacion' || plan === 'ambos' || plan === 'educativa') {
+    const nombres = [
+      "Sesión No. 1: Introducción y Autocuidado",
+      "Sesión No. 2: Parto Vaginal",
+      "Sesión No. 3: Cesárea y Postparto",
+      "Sesión No. 4: Lactancia",
+      "Sesión No. 5: Cuidados del Recién Nacido",
+      "Sesión No. 6: Técnicas de Confort",
+      "Sesión No. 7: Estimulación Prenatal",
+      "Sesión No. 8: Abuelos",
+      "Visita en Clínica",
+      "Visita de Cierre"
+    ];
+    sesiones = nombres.map(n => ({ nombre: n, fecha: "", firmaPaciente: "" }));
+  }
+
+  if (plan === 'fisico') {
+    // Para la física no le ponemos nombre, solo numeración
+    for (let i = 1; i <= 8; i++) {
+      sesiones.push({ nombre: `Sesión No. ${i}`, fecha: "", firmaPaciente: "" });
+    }
+  }
+
+  if (plan === 'intensivo' || plan === 'educacion intensiva') {
+    const nombres = [
+      "Sesión No. 1: Introducción y Autocuidado, Cuidados del recién Nacido, Estimulación Prenatal",
+      "Sesión No. 2: Trabajo de Parto, Cesárea",
+      "Sesión No. 3: Lactancia, Postparto"
+    ];
+    sesionesIntensivo = nombres.map(n => ({ nombre: n, fecha: "", firmaPaciente: "" }));
+  }
+
+  if (plan === 'ambos') {
+    // Si es ambos, el intensivo (o segunda parte) son las 8 sesiones físicas
+    for (let i = 1; i <= 8; i++) {
+      sesionesIntensivo.push({
+        nombre: `Sesión No. ${i} (Acondicionamiento Físico)`,
+        fecha: "",
+        firmaPaciente: ""
+      });
+    }
+  }
+
+  return { sesiones, sesionesIntensivo };
+};
+
+const crearSesionesEnCascada = async (valId, pacienteId, plan) => {
+  const { sesiones, sesionesIntensivo } = generarSesionesPerinatales(plan);
+  const todas = [...sesiones, ...sesionesIntensivo];
+
+  const docs = todas.map((s, idx) => ({
+    valoracionAsociada: valId,
+    paciente: pacienteId,
+    fechaInicioAtencion: new Date(), // Se inicializa con la fecha actual (requerido por RIPS)
+    codProcedimiento: '890204',
+    finalidadTecnologiaSalud: '44',
+    codDiagnosticoPrincipal: 'Z348', // Generico embarazo
+    numeroSesion: idx + 1,
+    descripcionEvolucion: s.nombre,
+    firmas: {
+      paciente: { firmaUrl: "", timestamp: null },
+      profesional: { nombre: "Ft. Dayan Ivonne Villegas Gamboa", registroMedico: "52862625", timestamp: null }
+    }
+  }));
+
+  if (docs.length > 0) {
+    await EvolucionSesion.insertMany(docs);
+    console.log(`✅ Creadas ${docs.length} sesiones (Evoluciones) para la valoración ${valId}`);
+  }
+};
+
 /**
  * @route   POST /api/valoraciones
  * @desc    Crear una nueva valoraciÃ³n unificada (PediatrÃ­a, Piso PÃ©lvico o Lactancia)
  */
 router.post('/', validarImagenes, async (req, res) => {
   try {
+    console.log('📬 RECIBIDA PETICIÓN POST /valoraciones:', JSON.stringify(req.body, null, 2));
     const { paciente, codConsulta } = req.body;
 
     if (!paciente) {
@@ -80,8 +159,33 @@ router.post('/', validarImagenes, async (req, res) => {
       });
     }
 
+    // Autocreación de sesiones para Perinatal si tiene plan
+    let planParaSesiones = null;
+    if (req.body.codConsulta === '890204') {
+      const plan = req.body.moduloPerinatal?.planElegido || req.body.tipoPrograma;
+
+      console.log('🔍 Validando creación de sesiones perinatales:', { plan });
+
+      if (plan) {
+        planParaSesiones = plan;
+        req.body.tipoPrograma = plan;
+      } else {
+        console.log('⚠️ No se programaron sesiones independientes: falta definir el plan.');
+      }
+    }
+
     const nuevaValoracion = new ValoracionFisioterapia(req.body);
     const valoracionGuardada = await nuevaValoracion.save();
+
+    // Crear sesiones (Evoluciones/Citas) si procede
+    if (planParaSesiones) {
+      try {
+        await crearSesionesEnCascada(valoracionGuardada._id, valoracionGuardada.paciente, planParaSesiones);
+      } catch (errSes) {
+        console.error('❌ Error creando sesiones en cascada:', errSes);
+      }
+    }
+
     res.status(201).json(valoracionGuardada);
   } catch (error) {
     console.error('Error al guardar valoraciÃ³n:', error);
@@ -95,7 +199,7 @@ router.post('/', validarImagenes, async (req, res) => {
  */
 router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req, res) => {
   try {
-    const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 15, modulo } = req.query;
+    const { busqueda, fechaInicio, fechaFin, pagina = 1, limite = 500, modulo } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
 
     let query = {};
@@ -117,6 +221,7 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
       if (modulo === 'pediatria') query.moduloPediatria = { $exists: true };
       if (modulo === 'pisoPelvico') query.moduloPisoPelvico = { $exists: true };
       if (modulo === 'lactancia') query.moduloLactancia = { $exists: true };
+      if (modulo === 'perinatal') query.codConsulta = '890204';
     }
 
     if (fechaInicio || fechaFin) {
@@ -132,8 +237,67 @@ router.get('/', logAccesoValoracionMiddleware('LISTAR_VALORACIONES'), async (req
       .skip(skip)
       .limit(parseInt(limite));
 
+    const tieneModuloPoblado = (obj) => {
+      if (!obj || typeof obj !== 'object') return false;
+      const json = JSON.stringify(obj);
+      if (json === '{}') return false;
+
+      // Eliminamos estructuras vacías de Mongoose y valores por defecto
+      const clean = json.replace(/[{}":,\[\]\s]/g, '').replace(/false|null|undefined/g, '');
+      // Para Piso Pelvico, Mongoose suele meter habitos, evaluacionFisica, etc como llaves aunque esten vacios
+      const keysToIgnore = ['habitos', 'evaluacionFisica', 'evaluacionMuscular', 'prenatales', 'perinatales', 'recienNacido', 'desarrolloSocial', 'hitos', 'examen', 'desarrolloMotor', 'motricidadFina', 'lenguaje', 'socioemocional'];
+      let content = clean;
+      keysToIgnore.forEach(k => content = content.split(k).join(''));
+
+      return content.length > 0;
+    };
+
+    const mapiado = await Promise.all(valoraciones.map(async v => {
+      // Prioridad absoluta al campo tipoPrograma si existe
+      let tipo = v.tipoPrograma || null;
+
+      if (!tipo) {
+        // Detectar tipo basándose en contenido REAL de los módulos
+        if (tieneModuloPoblado(v._doc?.moduloLactancia)) {
+          tipo = 'Lactancia';
+        } else if (tieneModuloPoblado(v._doc?.moduloPediatria)) {
+          tipo = 'Pediatría';
+        } else if (tieneModuloPoblado(v._doc?.moduloPisoPelvico)) {
+          tipo = 'Piso Pélvico';
+        }
+        // Fallback por codConsulta (retrocompatibilidad)
+        else if (v.codConsulta === '890204') {
+          tipo = 'Perinatal';
+        } else if (v.codConsulta === '890202') {
+          tipo = 'Piso Pélvico';
+        } else {
+          tipo = (v.codConsulta === '890201') ? 'Pediatría' : 'General';
+        }
+      }
+
+      // Si es perinatal, adjuntar información de progreso de sesiones independientes
+      let sesionesIndependientes = [];
+      if (v.codConsulta === '890204') {
+        const rawSesiones = await EvolucionSesion.find({ valoracionAsociada: v._id }).lean();
+        // Aliasing para retrocompatibilidad con la UI de arrays
+        sesionesIndependientes = rawSesiones.map(s => ({
+          ...s,
+          firmaPaciente: s.firmas?.paciente?.firmaUrl,
+          nombre: s.descripcionEvolucion,
+          fecha: s.fechaInicioAtencion
+        }));
+      }
+
+      return {
+        ...v._doc,
+        tipo,
+        sesiones: sesionesIndependientes.filter(s => !s.descripcionEvolucion?.includes('Intensivo') && !s.descripcionEvolucion?.includes('Físico')),
+        sesionesIntensivo: sesionesIndependientes.filter(s => s.descripcionEvolucion?.includes('Intensivo') || s.descripcionEvolucion?.includes('Físico'))
+      };
+    }));
+
     res.json({
-      valoraciones,
+      valoraciones: mapiado,
       paginacion: { total, pagina: parseInt(pagina), totalPaginas: Math.ceil(total / limite) }
     });
   } catch (error) {
@@ -176,27 +340,61 @@ router.get('/paciente/:pacienteId', async (req, res) => {
       .populate('paciente')
       .sort({ createdAt: -1 });
 
-    // Mapeo para compatibilidad con el frontend (que espera campo 'tipo' para decidir icono/ruta)
-    const mapiado = valoraciones.map(v => {
-      let tipo = 'General';
-      let ruta = '/detalle-valoracion/';
-      if (v.moduloPediatria && Object.keys(v.moduloPediatria).length > 1) tipo = 'PediatrÃ­a';
-      if (v.moduloPisoPelvico && v.moduloPisoPelvico.oxfordGlobal) {
-        tipo = 'Piso PÃ©lvico';
-        ruta = '/valoraciones-piso-pelvico/';
+    const { tieneModuloPoblado: tmpPop } = {
+      tieneModuloPoblado: (obj) => {
+        if (!obj || typeof obj !== 'object') return false;
+        const json = JSON.stringify(obj);
+        const clean = json.replace(/[{}":,\[\]\s]/g, '').replace(/false|null|undefined/g, '');
+        const keysToIgnore = ['habitos', 'evaluacionFisica', 'evaluacionMuscular', 'prenatales', 'perinatales', 'recienNacido', 'desarrolloSocial', 'hitos', 'examen', 'desarrolloMotor', 'motricidadFina', 'lenguaje', 'socioemocional'];
+        let content = clean;
+        keysToIgnore.forEach(k => content = content.split(k).join(''));
+        return content.length > 0;
       }
-      if (v.moduloLactancia && v.moduloLactancia.experienciaLactancia) {
-        tipo = 'Lactancia';
-        ruta = '/valoracion-ingreso-adultos-lactancia/';
+    };
+
+    const mapiado = await Promise.all(valoraciones.map(async v => {
+      let tipo = v.tipoPrograma || null;
+      let ruta = '/valoraciones/';
+
+      if (!tipo) {
+        if (tmpPop(v._doc?.moduloLactancia)) {
+          tipo = 'Lactancia';
+        } else if (tmpPop(v._doc?.moduloPediatria)) {
+          tipo = 'Pediatría';
+        } else if (tmpPop(v._doc?.moduloPisoPelvico)) {
+          tipo = 'Piso Pélvico';
+        } else if (v.codConsulta === '890204') {
+          tipo = 'Perinatal';
+        } else if (v.codConsulta === '890202') {
+          tipo = 'Piso Pélvico';
+        } else if (v.codConsulta === '890201') {
+          tipo = 'Pediatría';
+        } else {
+          tipo = 'General';
+        }
+      }
+
+      // Inyectar sesiones de EvolucionSesion si es perinatal
+      let sesionesIndependientes = [];
+      if (v.codConsulta === '890204') {
+        const rawSesiones = await EvolucionSesion.find({ valoracionAsociada: v._id }).lean();
+        sesionesIndependientes = rawSesiones.map(s => ({
+          ...s,
+          firmaPaciente: s.firmas?.paciente?.firmaUrl,
+          nombre: s.descripcionEvolucion,
+          fecha: s.fechaInicioAtencion
+        }));
       }
 
       return {
         ...v._doc,
         tipo,
         ruta: `${ruta}${v._id}`,
-        fecha: v.fechaInicioAtencion // Alias legacy
+        fecha: v.fechaInicioAtencion, // Alias legacy
+        sesiones: sesionesIndependientes.filter(s => !s.descripcionEvolucion?.includes('Intensivo') && !s.descripcionEvolucion?.includes('Físico')),
+        sesionesIntensivo: sesionesIndependientes.filter(s => s.descripcionEvolucion?.includes('Intensivo') || s.descripcionEvolucion?.includes('Físico'))
       };
-    });
+    }));
 
     res.json(mapiado);
   } catch (error) {
@@ -206,11 +404,29 @@ router.get('/paciente/:pacienteId', async (req, res) => {
 
 router.get('/:id', logAccesoValoracionMiddleware('CONSULTAR_VALORACION'), async (req, res) => {
   try {
-    const valoracion = await ValoracionFisioterapia.findById(req.params.id).populate('paciente');
+    const valoracion = await ValoracionFisioterapia.findById(req.params.id)
+      .populate('paciente')
+      .select('+_datosLegacy'); // Forzar la selección de datos legacy
     if (!valoracion) return res.status(404).json({ error: "No encontrada" });
-    res.json(valoracion);
+
+    const obj = valoracion.toObject();
+
+    // Inyectar sesiones si es perinatal
+    if (obj.codConsulta === '890204') {
+      const rawSesiones = await EvolucionSesion.find({ valoracionAsociada: obj._id }).lean();
+      const sesionesMapeadas = rawSesiones.map(s => ({
+        ...s,
+        firmaPaciente: s.firmas?.paciente?.firmaUrl,
+        nombre: s.descripcionEvolucion,
+        fecha: s.fechaInicioAtencion
+      }));
+      obj.sesiones = sesionesMapeadas.filter(s => !s.descripcionEvolucion?.includes('Intensivo') && !s.descripcionEvolucion?.includes('Físico'));
+      obj.sesionesIntensivo = sesionesMapeadas.filter(s => s.descripcionEvolucion?.includes('Intensivo') || s.descripcionEvolucion?.includes('Físico'));
+    }
+
+    res.json(obj);
   } catch (error) {
-    res.status(500).json({ mensaje: 'Error al obtener valoraciÃ³n', error });
+    res.status(500).json({ mensaje: 'Error al obtener valoración', error });
   }
 });
 
@@ -258,11 +474,36 @@ router.put('/:id', logAccesoValoracionMiddleware('ACTUALIZAR_VALORACION'), verif
       });
     }
 
+    // Autocreación de sesiones en actualización si tiene plan y no existen
+    let planDiferido = null;
+    if (valoracionActual.codConsulta === '890204' || req.body.codConsulta === '890204') {
+      const plan = req.body.moduloPerinatal?.planElegido || req.body.tipoPrograma || valoracionActual.moduloPerinatal?.planElegido;
+
+      // Consultar si ya existen sesiones (Evoluciones) para esta valoración
+      const countSesiones = await EvolucionSesion.countDocuments({ valoracionAsociada: req.params.id });
+      const sinSesiones = countSesiones === 0;
+
+      console.log('🔍 Validando creación diferida de sesiones perinatales (PUT):', { plan, sinSesiones });
+
+      if (plan && sinSesiones) {
+        planDiferido = plan;
+        req.body.tipoPrograma = plan;
+      }
+    }
+
     const actualizada = await ValoracionFisioterapia.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
+
+    if (planDiferido) {
+      try {
+        await crearSesionesEnCascada(actualizada._id, actualizada.paciente, planDiferido);
+      } catch (errSes) {
+        console.error('❌ Error creando sesiones diferidas en cascada:', errSes);
+      }
+    }
 
     res.json({ mensaje: 'Actualizada correctamente', valoracion: actualizada });
   } catch (error) {
