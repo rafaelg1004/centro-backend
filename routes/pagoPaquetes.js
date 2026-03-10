@@ -15,7 +15,7 @@ router.post("/", async (req, res) => {
 // Obtener todos los paquetes de un niño
 router.get("/por-nino/:ninoId", async (req, res) => {
   try {
-    const paquetes = await PagoPaquete.find({ nino: req.params.ninoId });
+    const paquetes = await PagoPaquete.find({ paciente: req.params.ninoId });
     res.json(paquetes);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -28,7 +28,7 @@ router.get("/buscar-por-nino/:ninoId", async (req, res) => {
     const { ninoId } = req.params;
     const { query } = req.query;
     
-    let filtro = { nino: ninoId };
+    let filtro = { paciente: ninoId };
     
     if (query && query.trim()) {
       filtro.numeroFactura = { $regex: query.trim(), $options: 'i' };
@@ -47,10 +47,10 @@ router.get("/buscar-por-nino/:ninoId", async (req, res) => {
 router.get("/reporte", async (req, res) => {
   try {
     const paquetes = await PagoPaquete.find()
-      .populate('nino', 'nombres registroCivil genero edad celular')
+      .populate('paciente', 'nombres registroCivil genero edad celular')
       .sort({ fechaPago: -1 });
 
-    const paquetesFiltrados = paquetes.filter(paquete => paquete.nino);
+    const paquetesFiltrados = paquetes.filter(paquete => paquete.paciente);
     
     // Obtener información de clases para cada paquete
     const Clase = require("../models/Clase");
@@ -60,19 +60,19 @@ router.get("/reporte", async (req, res) => {
       
       // Buscar clases donde está el paciente pero sin paquete
       const clasesSinPaquete = await Clase.find({ 
-        "ninos.nino": paquete.nino._id,
+        "ninos.nino": paquete.paciente._id,
         "ninos.numeroFactura": { $in: [null, ""] }
       });
       
       return {
         _id: paquete._id,
         paciente: {
-          _id: paquete.nino._id,
-          nombres: paquete.nino.nombres,
-          registroCivil: paquete.nino.registroCivil,
-          genero: paquete.nino.genero,
-          edad: paquete.nino.edad,
-          celular: paquete.nino.celular
+          _id: paquete.paciente._id,
+          nombres: paquete.paciente.nombres,
+          registroCivil: paquete.paciente.registroCivil,
+          genero: paquete.paciente.genero,
+          edad: paquete.paciente.edad,
+          celular: paquete.paciente.celular
         },
         numeroFactura: paquete.numeroFactura,
         clasesPagadas: paquete.clasesPagadas,
@@ -104,7 +104,7 @@ router.get("/reporte", async (req, res) => {
 router.post("/usar-clase", async (req, res) => {
   try {
     const { ninoId, numeroFactura } = req.body;
-    const paquete = await PagoPaquete.findOne({ nino: ninoId, numeroFactura });
+    const paquete = await PagoPaquete.findOne({ paciente: ninoId, numeroFactura });
 
     if (!paquete) {
       return res.status(404).json({ error: "Paquete no encontrado" });
@@ -132,12 +132,12 @@ router.get("/:id", async (req, res) => {
     
     // Obtener el paciente manualmente
     const Paciente = require("../models/Paciente");
-    const paciente = await Paciente.findById(paquete.nino);
+    const paciente = await Paciente.findById(paquete.paciente);
     
     // Crear el objeto de respuesta con la información del paciente
     const paqueteConPaciente = {
       _id: paquete._id,
-      nino: paciente,
+      paciente: paciente,
       numeroFactura: paquete.numeroFactura,
       clasesPagadas: paquete.clasesPagadas,
       clasesUsadas: paquete.clasesUsadas,
@@ -202,12 +202,12 @@ router.put("/:id", async (req, res) => {
     
     // Obtener el paciente manualmente
     const Paciente = require("../models/Paciente");
-    const paciente = await Paciente.findById(paqueteActualizado.nino);
+    const paciente = await Paciente.findById(paqueteActualizado.paciente);
     
     // Crear el objeto de respuesta con la información del paciente
     const paqueteConPaciente = {
       _id: paqueteActualizado._id,
-      nino: paciente,
+      paciente: paciente,
       numeroFactura: paqueteActualizado.numeroFactura,
       clasesPagadas: paqueteActualizado.clasesPagadas,
       clasesUsadas: paqueteActualizado.clasesUsadas,
