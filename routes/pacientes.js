@@ -115,7 +115,7 @@ router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
     }
 
     const pacientes = await Paciente.find(query)
-      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto pediatra nombreMadre nombrePadre ocupacionMadre ocupacionPadre ocupacion createdAt')
+      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto pediatra nombreMadre nombrePadre ocupacionMadre ocupacionPadre ocupacion peso talla createdAt')
       .sort({ nombres: 1 });
 
     console.log(`[DEBUG] Pacientes encontrados: ${pacientes.length} (query: ${JSON.stringify(query)})`);
@@ -180,7 +180,7 @@ router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) 
     }
 
     const pacientes = await Paciente.find(query)
-      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto createdAt')
+      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto pediatra nombreMadre nombrePadre ocupacionMadre ocupacionPadre ocupacion peso talla createdAt')
       .sort({ nombres: 1 })
       .limit(20);
 
