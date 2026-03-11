@@ -97,7 +97,7 @@ router.post("/", async (req, res) => {
     res.json({ mensaje: "Paciente registrado correctamente", id: paciente._id });
   } catch (error) {
     console.error("â Œ Error al registrar paciente:", error);
-    res.status(500).json({ error: "Error en el servidor", details: error.message });
+    res.status(500).json({ error: error.message || "Error en el servidor", details: error.message });
   }
 });
 
