@@ -336,9 +336,12 @@ router.get('/verificar/:pacienteId', async (req, res) => {
  */
 router.get('/paciente/:pacienteId', async (req, res) => {
   try {
-    const valoraciones = await ValoracionFisioterapia.find({ paciente: req.params.pacienteId })
+    const pId = req.params.pacienteId;
+
+    // 1. Obtener todas las valoraciones (incluyendo las migradas)
+    const valoraciones = await ValoracionFisioterapia.find({ paciente: pId })
       .populate('paciente')
-      .sort({ createdAt: -1 });
+      .sort({ fechaInicioAtencion: -1 });
 
     const { tieneModuloPoblado: tmpPop } = {
       tieneModuloPoblado: (obj) => {
@@ -357,24 +360,20 @@ router.get('/paciente/:pacienteId', async (req, res) => {
       let ruta = '/valoraciones/';
 
       if (!tipo) {
-        if (tmpPop(v._doc?.moduloLactancia)) {
-          tipo = 'Lactancia';
-        } else if (tmpPop(v._doc?.moduloPediatria)) {
-          tipo = 'Pediatría';
-        } else if (tmpPop(v._doc?.moduloPisoPelvico)) {
-          tipo = 'Piso Pélvico';
-        } else if (v.codConsulta === '890204') {
-          tipo = 'Perinatal';
-        } else if (v.codConsulta === '890202') {
-          tipo = 'Piso Pélvico';
-        } else if (v.codConsulta === '890201') {
-          tipo = 'Pediatría';
-        } else {
-          tipo = 'General';
-        }
+        if (tmpPop(v._doc?.moduloLactancia)) tipo = 'Lactancia';
+        else if (tmpPop(v._doc?.moduloPediatria)) tipo = 'Pediatría';
+        else if (tmpPop(v._doc?.moduloPisoPelvico)) tipo = 'Piso Pélvico';
+        else if (v.codConsulta === '890204') tipo = 'Perinatal';
+        else if (v.codConsulta === '890202') tipo = 'Piso Pélvico';
+        else if (v.codConsulta === '890201') tipo = 'Pediatría';
+        else tipo = 'General';
       }
 
-      // Inyectar sesiones de EvolucionSesion si es perinatal
+      // Si es una valoración migrada, podemos añadir un distintivo
+      if (v._legacyId) {
+        tipo += ' (Migrado)';
+      }
+
       let sesionesIndependientes = [];
       if (v.codConsulta === '890204') {
         const rawSesiones = await EvolucionSesion.find({ valoracionAsociada: v._id }).lean();
@@ -390,7 +389,7 @@ router.get('/paciente/:pacienteId', async (req, res) => {
         ...v._doc,
         tipo,
         ruta: `${ruta}${v._id}`,
-        fecha: v.fechaInicioAtencion, // Alias legacy
+        fecha: v.fechaInicioAtencion,
         sesiones: sesionesIndependientes.filter(s => !s.descripcionEvolucion?.includes('Intensivo') && !s.descripcionEvolucion?.includes('Físico')),
         sesionesIntensivo: sesionesIndependientes.filter(s => s.descripcionEvolucion?.includes('Intensivo') || s.descripcionEvolucion?.includes('Físico'))
       };
@@ -508,6 +507,32 @@ router.put('/:id', logAccesoValoracionMiddleware('ACTUALIZAR_VALORACION'), verif
     res.json({ mensaje: 'Actualizada correctamente', valoracion: actualizada });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al actualizar', error: error.message });
+  }
+});
+
+router.get('/legacy/:collection/:id', async (req, res) => {
+  try {
+    const { collection, id } = req.params;
+    const db = mongoose.connection.db;
+    
+    // Lista blanca de colecciones permitidas
+    const allowed = ['valoracioningresos', 'valoracioningresoadultoslactancias', 'valoracionpisopelvicos'];
+    if (!allowed.includes(collection)) {
+      return res.status(403).json({ error: "ColecciÃ³n no permitida" });
+    }
+
+    const doc = await db.collection(collection).findOne({ _id: new mongoose.Types.ObjectId(id) });
+    if (!doc) return res.status(404).json({ error: "No encontrada" });
+
+    // Intentar obtener el paciente para el nombre
+    let paciente = null;
+    if (doc.paciente) {
+      paciente = await db.collection('pacientes').findOne({ _id: new mongoose.Types.ObjectId(doc.paciente) });
+    }
+
+    res.json({ ...doc, _legacy: true, _collection: collection, paciente });
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al obtener valoraciÃ³n legacy', error: error.message });
   }
 });
 
