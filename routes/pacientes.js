@@ -79,7 +79,9 @@ router.post("/", async (req, res) => {
       tipoDocumentoIdentificacion: tipoDoc,
       // Si no vienen nombres/apellidos separados, intentar separar nombres
       nombres: req.body.nombres,
-      apellidos: req.body.apellidos || (req.body.nombres ? '' : 'SIN APELLIDO')
+      apellidos: req.body.apellidos || (req.body.nombres ? '' : 'SIN APELLIDO'),
+      // Sanitizar esAdulto para evitar errores de casteo (especialmente con strings vacÃos)
+      esAdulto: req.body.esAdulto === true || req.body.esAdulto === "true"
     };
 
     // Mapear datos de contacto si vienen en formato plano (legacy)
@@ -267,6 +269,10 @@ router.put('/:id', logAccesoMiddleware('ACTUALIZAR_PACIENTE'), async (req, res) 
         nombreAcompanante: req.body.acompanante || (updateData.datosContacto?.nombreAcompanante),
         telefonoAcompanante: req.body.telefonoAcompanante || (updateData.datosContacto?.telefonoAcompanante)
       };
+    }
+
+    if (req.body.esAdulto !== undefined) {
+      updateData.esAdulto = req.body.esAdulto === true || req.body.esAdulto === "true";
     }
 
     const actualizado = await Paciente.findByIdAndUpdate(
