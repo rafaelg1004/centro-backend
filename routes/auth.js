@@ -21,6 +21,7 @@ const usuarioSchema = new mongoose.Schema({
     default: 'auxiliar'
   },
   registroMedico: { type: String, default: "" }, // Registro profesional para validación de firmas
+  firmaUrl: { type: String, default: null }, // URL de la firma estampada almacenada en S3
   twoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret: { type: String, default: null },
   ultimoAcceso: { type: Date, default: null },
@@ -548,6 +549,7 @@ router.get("/me", verificarToken(), async (req, res) => {
       usuario: usuario.usuario,
       rol: usuario.rol,
       registroMedico: usuario.registroMedico,
+      firmaUrl: usuario.firmaUrl || null,
       twoFactorEnabled: usuario.twoFactorEnabled,
       ultimoAcceso: usuario.ultimoAcceso
     });
@@ -648,6 +650,35 @@ router.post("/change-password/:id", verificarToken(['administracion']), async (r
   }
 });
 
+// Actualizar perfil del usuario actual (nombre, registroMedico, firmaUrl)
+router.put("/me", verificarToken(), async (req, res) => {
+  try {
+    const { nombre, registroMedico, firmaUrl } = req.body;
+    const actualizacion = {};
+    if (nombre !== undefined) actualizacion.nombre = nombre;
+    if (registroMedico !== undefined) actualizacion.registroMedico = registroMedico;
+    if (firmaUrl !== undefined) actualizacion.firmaUrl = firmaUrl;
+
+    const usuario = await Usuario.findByIdAndUpdate(
+      req.usuario.id,
+      { $set: actualizacion },
+      { new: true, select: '-passwordHash -twoFactorSecret' }
+    );
+    if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+
+    res.json({
+      id: usuario._id,
+      nombre: usuario.nombre,
+      registroMedico: usuario.registroMedico,
+      firmaUrl: usuario.firmaUrl || null
+    });
+  } catch (error) {
+    console.error("Error actualizando perfil:", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
 // Exportar router y middleware
 router.verificarToken = verificarToken;
+router.Usuario = Usuario;
 module.exports = router;

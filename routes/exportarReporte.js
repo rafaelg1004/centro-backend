@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 // Modelo unificado - reemplaza todos los modelos de valoración
 const ValoracionFisioterapia = require('../models/ValoracionFisioterapia');
 
@@ -38,10 +39,30 @@ router.get('/exportar-pdf/:id', async (req, res) => {
       genero: valoracion.codSexo || 'N/A',
     };
 
+    // Obtener firma y datos del profesional que genera el reporte
+    let profesional = {
+      nombre: 'Ft. Dayan Ivonne Villegas Gamboa',
+      registroMedico: '52862625 - Reg. Salud Departamental',
+      firmaUrl: null
+    };
+    if (req.usuario?.id) {
+      try {
+        const Usuario = mongoose.model('Usuario');
+        const user = await Usuario.findById(req.usuario.id).select('nombre registroMedico firmaUrl');
+        if (user) {
+          profesional = {
+            nombre: user.nombre || profesional.nombre,
+            registroMedico: user.registroMedico || profesional.registroMedico,
+            firmaUrl: user.firmaUrl || null
+          };
+        }
+      } catch (e) { /* fallback a valores por defecto */ }
+    }
+
     // Intentar cargar el generador de PDF si existe
     try {
       const pdfGenerator = require('../utils/pdfReportGenerator');
-      const pdfBuffer = await pdfGenerator.generateValuationPDF(valoracion, paciente, reportType);
+      const pdfBuffer = await pdfGenerator.generateValuationPDF(valoracion, paciente, reportType, profesional);
       const sanitizedName = (paciente.nombres || 'REPORTE').replace(/\s+/g, '_');
       const fileName = `REPORTE_${reportType.toUpperCase()}_${sanitizedName}.pdf`;
 

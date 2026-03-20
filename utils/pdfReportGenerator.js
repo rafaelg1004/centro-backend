@@ -7,7 +7,7 @@ class PDFReportGenerator {
   /**
    * Generates a complete PDF report for a valuation
    */
-  async generateValuationPDF(valuation, paciente, type = 'nino') {
+  async generateValuationPDF(valuation, paciente, type = 'nino', profesional = {}) {
     return new Promise(async (resolve, reject) => {
       try {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -101,7 +101,18 @@ class PDFReportGenerator {
 
         // --- SIGNATURES AND TEXTS ---
         doc.addPage();
-        
+
+        // Datos del profesional (perfil o fallback)
+        const profNombre = profesional.nombre || 'Ft. Dayan Ivonne Villegas Gamboa';
+        const profRegistro = profesional.registroMedico || '52862625 - Reg. Salud Departamental';
+        // Firma estampada: prioridad al perfil del profesional, luego al formulario, luego al campo unificado
+        const profFirmaUrl = profesional.firmaUrl
+          || valuation.firmas?.profesional?.firmaUrl
+          || valuation.firmaProfesional
+          || valuation.firmaFisioterapeuta
+          || valuation.firmaFisio
+          || null;
+
         const addSignature = async (imageSource, label, name, id) => {
           if (!imageSource) return;
           doc.moveDown();
@@ -138,8 +149,8 @@ class PDFReportGenerator {
 
              doc.addPage();
              addSectionTitle("Aval Final");
-             await addSignature(valuation.firmaProfesional, "Firma del Profesional", valuation.nombreFisioterapeuta, valuation.cedulaFisioterapeuta);
-             await addSignature(valuation.firmaRepresentante, "Firma del Representante", valuation.nombreAcudiente, valuation.cedulaAcudiente);
+             await addSignature(profFirmaUrl, "Firma del Profesional", profNombre, profRegistro);
+             await addSignature(valuation.firmas?.pacienteOAcudiente?.firmaUrl || valuation.firmaRepresentante, "Firma del Representante", valuation.firmas?.pacienteOAcudiente?.nombre || valuation.nombreAcudiente, valuation.firmas?.pacienteOAcudiente?.cedula || valuation.cedulaAcudiente);
 
            } else if (type === 'adulto') {
              addSectionTitle("Autorización de Uso de Imagen");
@@ -153,8 +164,8 @@ class PDFReportGenerator {
 
              doc.addPage();
              addSectionTitle("Aval Final");
-             await addSignature(valuation.firmaFisioterapeuta || valuation.firmaFisio, "Firma del Profesional", "Dayan Ivonne Villegas Gamboa", "52862625");
-             await addSignature(valuation.firmaPaciente, "Firma del Paciente", paciente.nombres, paciente.cedula);
+             await addSignature(profFirmaUrl, "Firma del Profesional", profNombre, profRegistro);
+             await addSignature(valuation.firmas?.pacienteOAcudiente?.firmaUrl || valuation.firmaPaciente, "Firma del Paciente", paciente.nombres, paciente.cedula);
 
            } else if (type === 'lactancia') {
              addSectionTitle("Autorización de Imagen");
@@ -164,13 +175,13 @@ class PDFReportGenerator {
              doc.addPage();
              addSectionTitle("Consentimiento de Lactancia");
              doc.fontSize(8).text(`Yo ${paciente.nombres} con CC ${paciente.cedula} acepto participar en la asesoría de lactancia, entendiendo que no reemplaza una consulta médica y que el éxito depende de mi disposición.`, { align: 'justify' });
-             await addSignature(valuation.firmaConsentimientoLactancia, "Firma Madre/Paciente", paciente.nombres, paciente.cedula);
-             await addSignature(valuation.firmaProfesionalConsentimientoLactancia, "Firma Profesional Responsable", "Dayan Ivonne Villegas Gamboa", "52862625");
+             await addSignature(valuation.firmas?.pacienteOAcudiente?.firmaUrl || valuation.firmaConsentimientoLactancia, "Firma Madre/Paciente", paciente.nombres, paciente.cedula);
+             await addSignature(profFirmaUrl, "Firma Profesional Responsable", profNombre, profRegistro);
 
              doc.addPage();
              addSectionTitle("Aceptación Plan de Intervención");
-             await addSignature(valuation.firmaPaciente, "Firma Paciente", paciente.nombres, paciente.cedula);
-             await addSignature(valuation.firmaFisioterapeutaPlanIntervencion, "Firma Fisioterapeuta", "Dayan Ivonne Villegas Gamboa", "C.C. 52862625");
+             await addSignature(valuation.firmas?.pacienteOAcudiente?.firmaUrl || valuation.firmaPaciente, "Firma Paciente", paciente.nombres, paciente.cedula);
+             await addSignature(profFirmaUrl, "Firma Fisioterapeuta", profNombre, profRegistro);
 
            } else if (type === 'perinatal') {
              addSectionTitle("Autorización de Imagen");
@@ -180,15 +191,15 @@ class PDFReportGenerator {
              doc.addPage();
              addSectionTitle("Consentimiento Programa Perinatal");
              doc.fontSize(8).text(`Yo ${paciente.nombres} identificada con CC ${paciente.cedula} doy mi consentimiento expreso para el tratamiento y comprendo los beneficios y riesgos del programa.`, { align: 'justify' });
-             await addSignature(valuation.firmaPaciente, "Firma Paciente", paciente.nombres, paciente.cedula);
-             await addSignature(valuation.firmaFisioterapeuta, "Firma Fisioterapeuta", "Dayan Ivonne Villegas Gamboa", "52862625");
+             await addSignature(valuation.firmas?.pacienteOAcudiente?.firmaUrl || valuation.firmaPaciente, "Firma Paciente", paciente.nombres, paciente.cedula);
+             await addSignature(profFirmaUrl, "Firma Fisioterapeuta", profNombre, profRegistro);
              // Programas específicos si aplican
              if (valuation.firmaPacienteConsentimiento || (valuation.tipoPrograma === 'fisico' || valuation.tipoPrograma === 'ambos')) {
                doc.addPage();
                addSectionTitle("Consentimiento Acondicionamiento Físico");
                doc.fontSize(8).text("Programa de acondicionamiento físico perinatal (8 sesiones). Comprendo los riesgos y beneficios descritos en el protocolo de la entidad.", { align: 'justify' });
                await addSignature(valuation.firmaPacienteConsentimiento || valuation.firmaPacienteFisico, "Firma Paciente (Físico)", paciente.nombres, null);
-               await addSignature(valuation.firmaFisioterapeutaConsentimiento || valuation.firmaFisioterapeutaFisico, "Firma Fisioterapeuta (Físico)", "Dayan Ivonne Villegas Gamboa", "52862625");
+               await addSignature(profFirmaUrl, "Firma Fisioterapeuta (Físico)", profNombre, profRegistro);
              }
 
              if (valuation.firmaPacienteGeneral || (valuation.tipoPrograma === 'educacion' || valuation.tipoPrograma === 'ambos')) {
@@ -196,7 +207,7 @@ class PDFReportGenerator {
                addSectionTitle("Consentimiento Educación Perinatal");
                doc.fontSize(8).text("Programa de preparación para el nacimiento (10 sesiones). Entiendo los objetivos educativos y prácticos del programa.", { align: 'justify' });
                await addSignature(valuation.firmaPacienteGeneral, "Firma Paciente (Educación)", paciente.nombres, null);
-               await addSignature(valuation.firmaFisioterapeutaGeneral, "Firma Fisioterapeuta (Educación)", "Dayan Ivonne Villegas Gamboa", "52862625");
+               await addSignature(profFirmaUrl, "Firma Fisioterapeuta (Educación)", profNombre, profRegistro);
              }
 
              if (valuation.sesiones && valuation.sesiones.length > 0) {
@@ -206,6 +217,17 @@ class PDFReportGenerator {
                 });
              }
            }
+           // Pie de página legal - firma estampada
+           doc.moveDown(2);
+           doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#cccccc').stroke();
+           doc.moveDown(0.5);
+           const ahora = new Date();
+           const fechaFirma = ahora.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+           const horaFirma = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+           doc.fillColor('#555555').fontSize(7)
+              .text(`Documento firmado electrónicamente mediante acceso seguro de usuario ${profNombre} el día ${fechaFirma} a las ${horaFirma}.`, { align: 'center' })
+              .text('Este documento tiene validez legal de conformidad con la Ley 527 de 1999 de la República de Colombia.', { align: 'center' });
+
            doc.end();
         };
 
