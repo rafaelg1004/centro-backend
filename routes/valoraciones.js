@@ -162,13 +162,13 @@ router.post('/', validarImagenes, async (req, res) => {
     // Autocreación de sesiones para Perinatal si tiene plan
     let planParaSesiones = null;
     if (req.body.codConsulta === '890204') {
-      const plan = req.body.moduloPerinatal?.planElegido || req.body.tipoPrograma;
+      const plan = req.body.moduloPerinatal?.planElegido;
 
       console.log('🔍 Validando creación de sesiones perinatales:', { plan });
 
       if (plan) {
         planParaSesiones = plan;
-        req.body.tipoPrograma = plan;
+        // No sobreescribir tipoPrograma: debe conservarse como 'Perinatal' para detección correcta del esquema
       } else {
         console.log('⚠️ No se programaron sesiones independientes: falta definir el plan.');
       }
