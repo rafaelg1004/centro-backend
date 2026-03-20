@@ -21,23 +21,30 @@ class PDFReportGenerator {
         const textColor = '#374151'; // gray-700
 
         // --- Header ---
-        doc.fillColor(headerColor).fontSize(20).text("D'Mamitas & Babies", { align: 'center' });
+        doc.fillColor(headerColor).fontSize(16).font('Helvetica-Bold').text("D'Mamitas & Babies", 50, 50, { align: 'center' });
+        doc.fontSize(10).font('Helvetica').text("NIT: 900.000.000-0", { align: 'center' });
+        doc.text("Celular: 3000000000", { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fillColor(titleColor).fontSize(14).font('Helvetica-Bold').text("HISTORIA CLÍNICA", { align: 'center' });
+
         let subTitle = "Reporte Clínico";
         if (type === 'nino') subTitle = "Valoración de Ingreso Pediátrica";
         else if (type === 'adulto') subTitle = "Valoración de Piso Pélvico - Adultos";
         else if (type === 'lactancia') subTitle = "Valoración Adultos y Asesoría de Lactancia";
         else if (type === 'perinatal') subTitle = "Consentimiento y Valoración Programa Perinatal";
 
-        doc.fontSize(14).text(subTitle, { align: 'center' });
-        doc.moveDown();
+        doc.fontSize(11).text(subTitle, { align: 'center' });
+        doc.moveDown(0.5);
         doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
         doc.moveDown();
 
         // --- Section Helper ---
         const addSectionTitle = (title) => {
           doc.moveDown();
-          doc.fillColor(titleColor).fontSize(14).text(title, { underline: true });
-          doc.moveDown(0.5);
+          let currentY = doc.y;
+          doc.rect(50, currentY, 500, 16).fill('#eef2ff');
+          doc.fillColor(titleColor).fontSize(10).font('Helvetica-Bold').text(title.toUpperCase(), 55, currentY + 4);
+          doc.y = currentY + 22; // Salto manual después del rect
           doc.fillColor(textColor).fontSize(10);
         };
 
@@ -50,13 +57,28 @@ class PDFReportGenerator {
 
         // --- Patient Data ---
         addSectionTitle("Datos del Paciente");
-        addField("Nombres", paciente.nombres);
-        addField("Documento", paciente.numeroDocumento || paciente.registroCivil || paciente.cedula);
-        addField("Género", paciente.genero);
-        addField("Fecha Nacimiento", paciente.fechaNacimiento);
-        addField("Edad", paciente.edad);
-        addField("Dirección", paciente.direccion);
-        addField("Celular", paciente.celular || paciente.telefono);
+        
+        const patientFields = [
+          { label: "Nombre", value: paciente.nombres },
+          { label: "Identificación", value: paciente.numeroDocumento || paciente.registroCivil || paciente.cedula },
+          { label: "Edad", value: paciente.edad },
+          { label: "Género", value: paciente.genero },
+          { label: "F. Nacimiento", value: paciente.fechaNacimiento },
+          { label: "Dirección", value: paciente.direccion },
+          { label: "Celular", value: paciente.celular || paciente.telefono },
+          { label: "Aseguradora", value: paciente.aseguradora || 'No especificada' }
+        ];
+
+        let ptY = doc.y;
+        patientFields.forEach((field, idx) => {
+          let isEven = idx % 2 === 0;
+          let x = isEven ? 55 : 300;
+          let y = ptY + Math.floor(idx / 2) * 15;
+          doc.font('Helvetica-Bold').fontSize(10).text(`${field.label}: `, x, y, { continued: true })
+             .font('Helvetica').text(String(field.value || 'No especificado'));
+        });
+        doc.y = ptY + Math.ceil(patientFields.length / 2) * 15 + 10;
+
 
         // --- Valuation Specifics ---
         if (type === 'nino') {
@@ -102,16 +124,13 @@ class PDFReportGenerator {
         // --- SIGNATURES AND TEXTS ---
         doc.addPage();
 
-        // Datos del profesional (perfil o fallback)
-        const profNombre = profesional.nombre || 'Ft. Dayan Ivonne Villegas Gamboa';
-        const profRegistro = profesional.registroMedico || '52862625 - Reg. Salud Departamental';
-        // Firma estampada: prioridad al perfil del profesional, luego al formulario, luego al campo unificado
-        const profFirmaUrl = profesional.firmaUrl
-          || valuation.firmas?.profesional?.firmaUrl
-          || valuation.firmaProfesional
-          || valuation.firmaFisioterapeuta
-          || valuation.firmaFisio
-          || null;
+        // Datos del profesional:
+        // - Nombre/registro: lo que guardó el formulario tiene prioridad (quien firmó)
+        // - Firma: prioridad a la firma dibujada/guardada en la valoración; solo si no existe se usa la firma del perfil (estampada)
+        const profNombre = valuation.firmas?.profesional?.nombre || profesional.nombre || 'Ft. Dayan Ivonne Villegas Gamboa';
+        const profRegistro = valuation.firmas?.profesional?.registroMedico || profesional.registroMedico || '52862625 - Reg. Salud Departamental';
+        // Firma del profesional: únicamente del perfil del creador (firmaUrl = null si no tiene firma guardada)
+        const profFirmaUrl = profesional.firmaUrl || null;
 
         const addSignature = async (imageSource, label, name, id) => {
           if (!imageSource) return;

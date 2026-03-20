@@ -174,7 +174,10 @@ router.post('/', validarImagenes, async (req, res) => {
       }
     }
 
-    const nuevaValoracion = new ValoracionFisioterapia(req.body);
+    const nuevaValoracion = new ValoracionFisioterapia({
+      ...req.body,
+      creadoPor: req.usuario?.id || null
+    });
     const valoracionGuardada = await nuevaValoracion.save();
 
     // Crear sesiones (Evoluciones/Citas) si procede

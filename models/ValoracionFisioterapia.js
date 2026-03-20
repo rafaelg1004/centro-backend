@@ -3,6 +3,7 @@ const Schema = mongoose.Schema;
 
 const ValoracionFisioterapiaSchema = new Schema({
     paciente: { type: Schema.Types.ObjectId, ref: 'Paciente', required: true },
+    creadoPor: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
 
     // Tipo de valoración: 'Pediatría' | 'Piso Pélvico' | 'Lactancia' | 'Perinatal' | 'General'
     tipoPrograma: { type: String, default: null },

@@ -17,7 +17,8 @@ router.get('/exportar-pdf/:id', async (req, res) => {
     // Buscar en el modelo unificado. Usamos `+_datosLegacy` para incluir ese campo.
     const valoracion = await ValoracionFisioterapia.findById(id)
       .select('+_datosLegacy')
-      .populate('paciente');
+      .populate('paciente')
+      .populate('creadoPor', 'nombre registroMedico firmaUrl');
 
     if (!valoracion) {
       return res.status(404).json({ message: 'Valoración no encontrada' });
@@ -39,25 +40,13 @@ router.get('/exportar-pdf/:id', async (req, res) => {
       genero: valoracion.codSexo || 'N/A',
     };
 
-    // Obtener firma y datos del profesional que genera el reporte
-    let profesional = {
-      nombre: 'Ft. Dayan Ivonne Villegas Gamboa',
-      registroMedico: '52862625 - Reg. Salud Departamental',
-      firmaUrl: null
+    // Datos del profesional: se toman del usuario que CREÓ la valoración
+    const creador = valoracion.creadoPor;
+    const profesional = {
+      nombre: creador?.nombre || 'Ft. Dayan Ivonne Villegas Gamboa',
+      registroMedico: creador?.registroMedico || '52862625 - Reg. Salud Departamental',
+      firmaUrl: creador?.firmaUrl || null  // null = no se pinta nada
     };
-    if (req.usuario?.id) {
-      try {
-        const Usuario = mongoose.model('Usuario');
-        const user = await Usuario.findById(req.usuario.id).select('nombre registroMedico firmaUrl');
-        if (user) {
-          profesional = {
-            nombre: user.nombre || profesional.nombre,
-            registroMedico: user.registroMedico || profesional.registroMedico,
-            firmaUrl: user.firmaUrl || null
-          };
-        }
-      } catch (e) { /* fallback a valores por defecto */ }
-    }
 
     // Intentar cargar el generador de PDF si existe
     try {
