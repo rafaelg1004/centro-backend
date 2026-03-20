@@ -116,7 +116,9 @@ const ValoracionFisioterapiaSchema = new Schema({
         socioemocional: {
             sonrieSocialmente: String, respondeNombre: String, interesaOtrosNinos: String,
             juegoSimbolico: String, seDespide: String
-        }
+        },
+        emocionesExpresadas: [String],
+        relacionEntorno: String
     },
 
     moduloPisoPelvico: {
