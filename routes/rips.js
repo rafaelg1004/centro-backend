@@ -185,6 +185,8 @@ router.post('/generate', authenticate, async (req, res) => {
     const resultado = await converter.convertToRIPS(converterData);
 
     if (!resultado.isValid) {
+      console.error('❌ Errores de validación RIPS:', resultado.validationErrors);
+      console.warn('⚠️ Advertencias RIPS:', resultado.validationWarnings);
       return res.status(400).json({
         success: false,
         message: 'Errores de validación en la generación de RIPS',
@@ -201,9 +203,8 @@ router.post('/generate', authenticate, async (req, res) => {
         rips: resultado.rips,
         resumen: {
           usuariosProcesados: resultado.rips.usuarios.length,
-          serviciosTecnologicos: resultado.rips.serviciosTecnologias.length,
-          totalConsultas: resultado.rips.serviciosTecnologias.reduce((sum, s) => sum + s.consultas.length, 0),
-          totalProcedimientos: resultado.rips.serviciosTecnologias.reduce((sum, s) => sum + s.procedimientos.length, 0)
+          totalConsultas: resultado.rips.usuarios.reduce((sum, u) => sum + (u.servicios?.consultas?.length || 0), 0),
+          totalProcedimientos: resultado.rips.usuarios.reduce((sum, u) => sum + (u.servicios?.procedimientos?.length || 0), 0)
         },
         warnings: resultado.validationWarnings
       }

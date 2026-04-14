@@ -26,7 +26,7 @@ class RIPSConverter {
     if (typeof val !== 'string') return val;
     // Si contiene " - ", tomar solo la primera parte
     const parts = val.split(' - ');
-    return parts[0].trim().toUpperCase();
+    return parts[0].trim().toUpperCase().replace(/\./g, '');
   }
 
   /**
@@ -132,26 +132,39 @@ class RIPSConverter {
         throw new Error('Datos de entrada inválidos: se requiere numFactura o marcar sin factura');
       }
 
+      this.sinFactura = !!data.sinFactura;
+
       const ripsData = {
-        numDocumentoldObligado: this.getNITFacturador(),
+        numDocumentoIdObligado: this.getNITFacturador(),
         numFactura: data.sinFactura ? null : data.numFactura,
-        tipoNota: null,
-        numNota: null,
-        usuarios: [],
-        serviciosTecnologias: []
+        tipoNota: data.sinFactura ? 'RS' : null,
+        numNota: data.sinFactura ? (data.numFactura || '0') : null,
+        usuarios: []
       };
+
+      let indiceUsuario = 0;
 
       // Procesar cada paciente
       for (const pacienteData of data.pacientes) {
-        const usuario = await this.convertUsuario(pacienteData);
+        indiceUsuario++;
+        const usuario = await this.convertUsuario(pacienteData, indiceUsuario);
         const servicios = await this.convertServicios(pacienteData);
 
-        if (usuario) {
+        // Solo agregar si el usuario existe Y tiene al menos un servicio
+        const tieneServicios = servicios.consultas?.length > 0 ||
+                              servicios.procedimientos?.length > 0 ||
+                              servicios.urgencias?.length > 0 ||
+                              servicios.hospitalizacion?.length > 0 ||
+                              servicios.recienNacidos?.length > 0 ||
+                              servicios.medicamentos?.length > 0 ||
+                              servicios.otrosServicios?.length > 0;
+
+        if (usuario && tieneServicios) {
+          // Agregar servicios al usuario para que tenga la estructura requerida
+          usuario.servicios = servicios;
           ripsData.usuarios.push(usuario);
-          ripsData.serviciosTecnologias.push({
-            ...servicios,
-            consecutivo: usuario.consecutivo
-          });
+        } else if (usuario && !tieneServicios) {
+          this.validationWarnings.push(`Usuario ${usuario.numDocumentoIdentificacion} no tiene servicios, omitido`);
         }
       }
 
@@ -187,13 +200,13 @@ class RIPSConverter {
    * Obtiene el código de servicio REPS del prestador
    */
   getCodigoServicioREPS() {
-    return ripsConfig.prestador.codServicioREPS || '739';
+    return ripsConfig.prestador.codServicioREPS ? parseInt(ripsConfig.prestador.codServicioREPS) : 739;
   }
 
   /**
    * Convierte datos del paciente a formato RIPS usuario
    */
-  async convertUsuario(pacienteData) {
+  async convertUsuario(pacienteData, indiceUsuario) {
     try {
       const paciente = pacienteData.paciente || pacienteData;
 
@@ -207,16 +220,17 @@ class RIPSConverter {
       const tipoDocumentoValidado = this.validarTipoDocumento(paciente.tipoDocumento, edad);
 
       return {
-        tipoDocumentoldentificacion: tipoDocumentoValidado,
-        numDocumentoldentificacion: paciente.numeroDocumento,
+        tipoDocumentoIdentificacion: tipoDocumentoValidado,
+        numDocumentoIdentificacion: paciente.numeroDocumento,
         tipoUsuario: this.mapTipoUsuario(paciente.regimenAfiliacion),
-        fechaNacimiento: this.formatFechaRIPS(paciente.fechaNacimiento),
+        fechaNacimiento: this.formatFechaNacimiento(paciente.fechaNacimiento),
         codSexo: codSexo,
         codPaisResidencia: paciente.codPaisResidencia || '170', // Colombia por defecto
         codMunicipioResidencia: paciente.codMunicipioResidencia || '23001', // Montería por defecto
         codZonaTerritorialResidencia: paciente.codZonaTerritorialResidencia || '01', // Urbana por defecto
-        incapacidad: '02', // No aplica incapacidad por defecto
-        consecutivo: pacienteData.consecutivo || 1
+        incapacidad: 'NO', // No aplica incapacidad por defecto
+        servicios: null, // Se llena después con los servicios del usuario
+        consecutivo: indiceUsuario
       };
 
     } catch (error) {
@@ -242,32 +256,36 @@ class RIPSConverter {
     try {
       // Convertir valoraciones de ingreso a consultas
       if (pacienteData.valoracionesIngreso) {
-        for (const valoracion of pacienteData.valoracionesIngreso) {
-          const consulta = await this.convertConsulta(valoracion, pacienteData);
+        for (let i = 0; i < pacienteData.valoracionesIngreso.length; i++) {
+          const valoracion = pacienteData.valoracionesIngreso[i];
+          const consulta = await this.convertConsulta(valoracion, i + 1);
           if (consulta) servicios.consultas.push(consulta);
         }
       }
 
       // Convertir clases a procedimientos
       if (pacienteData.clases) {
-        for (const clase of pacienteData.clases) {
-          const procedimiento = await this.convertProcedimiento(clase, pacienteData);
+        for (let i = 0; i < pacienteData.clases.length; i++) {
+          const clase = pacienteData.clases[i];
+          const procedimiento = await this.convertProcedimiento(clase, i + 1);
           if (procedimiento) servicios.procedimientos.push(procedimiento);
         }
       }
 
       // Convertir sesiones perinatales
       if (pacienteData.sesionesPerinatales) {
-        for (const sesion of pacienteData.sesionesPerinatales) {
-          const procedimiento = await this.convertSesionPerinatal(sesion, pacienteData);
+        for (let i = 0; i < pacienteData.sesionesPerinatales.length; i++) {
+          const sesion = pacienteData.sesionesPerinatales[i];
+          const procedimiento = await this.convertSesionPerinatal(sesion, servicios.procedimientos.length + 1);
           if (procedimiento) servicios.procedimientos.push(procedimiento);
         }
       }
 
       // Convertir valoraciones de piso pélvico
       if (pacienteData.valoracionesPisoPelvico) {
-        for (const valoracion of pacienteData.valoracionesPisoPelvico) {
-          const procedimiento = await this.convertValoracionPisoPelvico(valoracion, pacienteData);
+        for (let i = 0; i < pacienteData.valoracionesPisoPelvico.length; i++) {
+          const valoracion = pacienteData.valoracionesPisoPelvico[i];
+          const procedimiento = await this.convertValoracionPisoPelvico(valoracion, servicios.procedimientos.length + 1);
           if (procedimiento) servicios.procedimientos.push(procedimiento);
         }
       }
@@ -282,7 +300,7 @@ class RIPSConverter {
   /**
    * Convierte valoración de ingreso a consulta RIPS
    */
-  async convertConsulta(valoracion, pacienteData) {
+  async convertConsulta(valoracion, consecutive) {
     try {
       const tipoConsultaKey = this.determinarTipoConsulta(valoracion.motivoDeConsulta);
 
@@ -290,11 +308,11 @@ class RIPSConverter {
       const finalidad = valoracion.finalidad || this.getFinalidadDinamica(tipoConsultaKey);
       const diagnostico = this.extractCIE10(valoracion.codDiagnosticoPrincipal) || this.determinarDiagnosticoCIE(valoracion.motivoDeConsulta);
       const codConsulta = valoracion.codConsulta || this.getCodigoCUPSDinamico(tipoConsultaKey);
-      const causa = valoracion.causaExterna || ripsConfig.causasMotivoAtencion.consultaExterna;
+      const causa = valoracion.causaExterna || valoracion.causa || ripsConfig.causasMotivoAtencion.consultaExterna;
 
       return {
         codPrestador: this.getCodigoPrestador(),
-        fechalnicioAtencion: this.formatFechaRIPS(valoracion.fecha),
+        fechaInicioAtencion: this.formatFechaRIPS(valoracion.fecha),
         numAutorizacion: valoracion.numAutorizacion || null,
         codConsulta: codConsulta,
         modalidadGrupoServicioTecSal: ripsConfig.modalidades.consultaExterna,
@@ -307,13 +325,11 @@ class RIPSConverter {
         codDiagnosticoRelacionado2: null,
         codDiagnosticoRelacionado3: null,
         tipoDiagnosticoPrincipal: '01', // Confirmado
-        tipoDocumentoldentificacion: valoracion.profesionalTratante?.tipoDocumento || 'CC',
-        numDocumentoldentificacion: valoracion.profesionalTratante?.numeroDocumento || '00000000',
-        vrServicio: valoracion.vrServicio || this.getValorServicioDinamico(tipoConsultaKey),
-        tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
-        valorPagoModerador: 0,
-        numFEVPagoModerador: null,
-        consecutivo: 1
+        tipoDocumentoIdentificacion: valoracion.profesionalTratante?.tipoDocumento || 'CC',
+        numDocumentoIdentificacion: valoracion.profesionalTratante?.numeroDocumento || '00000000',
+        vrServicio: this.sinFactura ? 0 : (valoracion.vrServicio || this.getValorServicioDinamico(tipoConsultaKey)),
+        conceptoRecaudo: this.sinFactura ? '05' : '01',
+        consecutivo: consecutive
       };
     } catch (error) {
       this.validationErrors.push(`Error convirtiendo consulta: ${error.message}`);
@@ -324,7 +340,7 @@ class RIPSConverter {
   /**
    * Convierte clase a procedimiento RIPS
    */
-  async convertProcedimiento(clase, pacienteData) {
+  async convertProcedimiento(clase, consecutive) {
     try {
       const tipoProcedimientoKey = this.determinarTipoProcedimiento(clase.titulo);
       const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
@@ -332,7 +348,7 @@ class RIPSConverter {
 
       return {
         codPrestador: this.getCodigoPrestador(),
-        fechalnicioAtencion: this.formatFechaRIPS(clase.fecha),
+        fechaInicioAtencion: this.formatFechaRIPS(clase.fecha),
         idMIPRES: null,
         numAutorizacion: null,
         codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
@@ -341,16 +357,14 @@ class RIPSConverter {
         grupoServicios: ripsConfig.gruposServicios.procedimientos,
         codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
-        tipoDocumentoldentificacion: clase.instructor?.tipoDocumento || 'CC',
-        numDocumentoldentificacion: clase.instructor?.numeroDocumento || '00000000',
+        tipoDocumentoIdentificacion: clase.instructor?.tipoDocumento || 'CC',
+        numDocumentoIdentificacion: clase.instructor?.numeroDocumento || '00000000',
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado: null,
         codComplicacion: null,
-        vrServicio: clase.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
-        tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
-        valorPagoModerador: 0,
-        numFEVPagoModerador: null,
-        consecutivo: 1
+        vrServicio: this.sinFactura ? 0 : (clase.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey)),
+        conceptoRecaudo: this.sinFactura ? '05' : '01',
+        consecutivo: consecutive
       };
     } catch (error) {
       this.validationErrors.push(`Error convirtiendo procedimiento: ${error.message}`);
@@ -361,7 +375,7 @@ class RIPSConverter {
   /**
    * Convierte sesión perinatal a procedimiento RIPS
    */
-  async convertSesionPerinatal(sesion, pacienteData) {
+  async convertSesionPerinatal(sesion, consecutive) {
     try {
       const tipoProcedimientoKey = this.determinarTipoProcedimiento('preparación parto');
       const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
@@ -369,7 +383,7 @@ class RIPSConverter {
 
       return {
         codPrestador: this.getCodigoPrestador(),
-        fechalnicioAtencion: this.formatFechaRIPS(sesion.fecha),
+        fechaInicioAtencion: this.formatFechaRIPS(sesion.fecha),
         idMIPRES: null,
         numAutorizacion: null,
         codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
@@ -378,16 +392,14 @@ class RIPSConverter {
         grupoServicios: ripsConfig.gruposServicios.procedimientos,
         codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
-        tipoDocumentoldentificacion: sesion.profesional?.tipoDocumento || 'CC',
-        numDocumentoldentificacion: sesion.profesional?.numeroDocumento || '00000000',
+        tipoDocumentoIdentificacion: sesion.profesional?.tipoDocumento || 'CC',
+        numDocumentoIdentificacion: sesion.profesional?.numeroDocumento || '00000000',
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado: null,
         codComplicacion: null,
-        vrServicio: sesion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
-        tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
-        valorPagoModerador: 0,
-        numFEVPagoModerador: null,
-        consecutivo: 1
+        vrServicio: this.sinFactura ? 0 : (sesion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey)),
+        conceptoRecaudo: this.sinFactura ? '05' : '01',
+        consecutivo: consecutive
       };
     } catch (error) {
       this.validationErrors.push(`Error convirtiendo sesión perinatal: ${error.message}`);
@@ -398,7 +410,7 @@ class RIPSConverter {
   /**
    * Convierte valoración de piso pélvico a procedimiento RIPS
    */
-  async convertValoracionPisoPelvico(valoracion, pacienteData) {
+  async convertValoracionPisoPelvico(valoracion, consecutive) {
     try {
       const tipoProcedimientoKey = this.determinarTipoProcedimiento('piso pélvico');
       const finalidad = this.getFinalidadDinamica(tipoProcedimientoKey);
@@ -406,7 +418,7 @@ class RIPSConverter {
 
       return {
         codPrestador: this.getCodigoPrestador(),
-        fechalnicioAtencion: this.formatFechaRIPS(valoracion.fecha),
+        fechaInicioAtencion: this.formatFechaRIPS(valoracion.fecha),
         idMIPRES: null,
         numAutorizacion: null,
         codProcedimiento: this.getCodigoCUPSDinamico(tipoProcedimientoKey),
@@ -415,16 +427,14 @@ class RIPSConverter {
         grupoServicios: ripsConfig.gruposServicios.procedimientos,
         codServicio: this.getCodigoServicioREPS(),
         finalidadTecnologiaSalud: finalidad,
-        tipoDocumentoldentificacion: 'CC',
-        numDocumentoldentificacion: '00000000',
+        tipoDocumentoIdentificacion: 'CC',
+        numDocumentoIdentificacion: '00000000',
         codDiagnosticoPrincipal: diagnostico,
         codDiagnosticoRelacionado: null,
         codComplicacion: null,
-        vrServicio: valoracion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey),
-        tipoPagoModerador: ripsConfig.tiposPagoModerador.noAplica,
-        valorPagoModerador: 0,
-        numFEVPagoModerador: null,
-        consecutivo: 1
+        vrServicio: this.sinFactura ? 0 : (valoracion.vrServicio || this.getValorServicioDinamico(tipoProcedimientoKey)),
+        conceptoRecaudo: this.sinFactura ? '05' : '01',
+        consecutivo: consecutive
       };
     } catch (error) {
       this.validationErrors.push(`Error convirtiendo valoración piso pélvico: ${error.message}`);
@@ -560,11 +570,29 @@ class RIPSConverter {
   formatFechaRIPS(fecha) {
     if (!fecha) return null;
     const date = new Date(fecha);
-    return date.toISOString().slice(0, 16).replace('T', ' '); // Formato AAAA-MM-DD HH:MM
+    // Formato RIPS: AAAA-MM-DD HH:MM (según Resolución)
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  }
+
+  /**
+   * Formato solo fecha: AAAA-MM-DD (para fechaNacimiento)
+   */
+  formatFechaNacimiento(fecha) {
+    if (!fecha) return null;
+    const date = new Date(fecha);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   getCodigoPrestador() {
-    return ripsConfig.prestador.codPrestador;
+    return ripsConfig.prestador.codPrestador ? String(ripsConfig.prestador.codPrestador) : '230010113301';
   }
 
   /**
@@ -572,7 +600,7 @@ class RIPSConverter {
    */
   validateRIPS(ripsData, sinFactura = false) {
     // RVG01: Estructura básica
-    if (!ripsData.numDocumentoldObligado) {
+    if (!ripsData.numDocumentoIdObligado) {
       this.validationErrors.push('RVG01: Falta información básica del obligado');
     }
 
@@ -584,27 +612,19 @@ class RIPSConverter {
       this.validationErrors.push('RVG01: Para reporte sin factura, numFactura debe ser null');
     }
 
-    // RVG03: Al menos un servicio
-    const tieneServicios = ripsData.serviciosTecnologias.some(servicio =>
-      servicio.consultas?.length > 0 ||
-      servicio.procedimientos?.length > 0 ||
-      servicio.urgencias?.length > 0 ||
-      servicio.hospitalizacion?.length > 0 ||
-      servicio.recienNacidos?.length > 0 ||
-      servicio.medicamentos?.length > 0 ||
-      servicio.otrosServicios?.length > 0
+    // RVG03: Al menos un servicio (verificar dentro de cada usuario)
+    const tieneServicios = ripsData.usuarios.some(usuario =>
+      usuario.servicios?.consultas?.length > 0 ||
+      usuario.servicios?.procedimientos?.length > 0 ||
+      usuario.servicios?.urgencias?.length > 0 ||
+      usuario.servicios?.hospitalizacion?.length > 0 ||
+      usuario.servicios?.recienNacidos?.length > 0 ||
+      usuario.servicios?.medicamentos?.length > 0 ||
+      usuario.servicios?.otrosServicios?.length > 0
     );
 
     if (!tieneServicios) {
       this.validationErrors.push('RVG03: No se encontraron servicios prestados');
-    }
-
-    // RVG07: Usuarios relacionados con servicios
-    const consecutivosServicios = ripsData.serviciosTecnologias.map(s => s.consecutivo);
-    const consecutivosUsuarios = ripsData.usuarios.map(u => u.consecutivo);
-
-    if (!consecutivosServicios.every(c => consecutivosUsuarios.includes(c))) {
-      this.validationErrors.push('RVG07: Existen servicios sin usuario correspondiente');
     }
   }
 }

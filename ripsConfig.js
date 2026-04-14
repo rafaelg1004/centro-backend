@@ -7,7 +7,7 @@ const ripsConfig = {
   // Información del prestador
   // Información del prestador (Datos oficiales Habilitación DHSS0230433)
   prestador: {
-    nit: process.env.NIT_FACTURADOR || '2300101133', // Usando Código Prestador base como NIT (Confirmar si es CC diferente)
+    nit: process.env.NIT_FACTURADOR || '52862625', // CC de la prestadora Dayan Ivonne Villegas Gamboa
     codPrestador: process.env.COD_PRESTADOR || '230010113301',
     nombre: 'Dayan Ivonne Villegas Gamboa',
     especialidad: 'Fisioterapia Perinatal',
@@ -117,17 +117,17 @@ const ripsConfig = {
     '881411': '44'
   },
 
-  // Códigos CIE-10 (Mantener los existentes más comunes)
+  // Códigos CIE-10 (sin punto, según formato RIPS)
   diagnosticosCIE: {
-    fisioterapiaGeneral: 'Z51.4',
-    embarazo: 'Z34.9',
-    parto: 'Z39.2',
-    incontinenciaUrinaria: 'N39.3',
-    prolapsoGenital: 'N81.9',
-    problemasLactancia: 'Z39.1',
-    desarrolloPsicomotor: 'R62.0',
-    paralisisCerebral: 'G80.9',
-    promocionSalud: 'Z00.0'
+    fisioterapiaGeneral: 'Z514',
+    embarazo: 'Z349',
+    parto: 'Z392',
+    incontinenciaUrinaria: 'N393',
+    prolapsoGenital: 'N819',
+    problemasLactancia: 'Z391',
+    desarrolloPsicomotor: 'R620',
+    paralisisCerebral: 'G809',
+    promocionSalud: 'Z000'
   },
 
   // Tipos de pago moderador
