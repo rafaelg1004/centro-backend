@@ -1,5 +1,5 @@
 const express = require("express");
-const Paciente = require("../models/Paciente");
+const { Paciente } = require("../models-sequelize");
 const path = require("path");
 const fs = require("fs");
 
@@ -10,43 +10,49 @@ function logAccesoPaciente(tipo, usuario, pacienteId, detalles = {}) {
   const logEntry = {
     timestamp: new Date().toISOString(),
     tipo,
-    usuario: usuario || 'desconocido',
+    usuario: usuario || "desconocido",
     pacienteId,
-    ip: detalles.ip || 'N/A',
-    userAgent: detalles.userAgent || 'N/A',
-    ...detalles
+    ip: detalles.ip || "N/A",
+    userAgent: detalles.userAgent || "N/A",
+    ...detalles,
   };
 
-  const logFile = path.join(__dirname, '../logs/acceso-pacientes.log');
+  const logFile = path.join(__dirname, "../logs/acceso-pacientes.log");
   const logDir = path.dirname(logFile);
 
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
 
-  const logLine = JSON.stringify(logEntry) + '\n';
+  const logLine = JSON.stringify(logEntry) + "\n";
 
   try {
     fs.appendFileSync(logFile, logLine);
-    console.log(`ðŸ“‹ LOG PACIENTE [${tipo}]: ${usuario || 'desconocido'} - Paciente: ${pacienteId} - ${detalles.accion || 'Sin acciÃ³n'}`);
+    console.log(
+      `ðŸ“‹ LOG PACIENTE [${tipo}]: ${usuario || "desconocido"} - Paciente: ${pacienteId} - ${detalles.accion || "Sin acciÃ³n"}`,
+    );
   } catch (error) {
-    console.error('â Œ Error escribiendo log de acceso a pacientes:', error);
+    console.error("â Œ Error escribiendo log de acceso a pacientes:", error);
   }
 }
 
 const logAccesoMiddleware = (accion) => {
   return (req, res, next) => {
-    const usuario = req.usuario?.usuario || 'desconocido';
-    const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    const pacienteId = req.params.id || 'multiple';
+    const usuario = req.usuario?.username || "desconocido";
+    const clientIP =
+      req.ip ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      "unknown";
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const pacienteId = req.params.id || "multiple";
 
-    logAccesoPaciente('ACCESO_PACIENTE', usuario, pacienteId, {
+    logAccesoPaciente("ACCESO_PACIENTE", usuario, pacienteId, {
       ip: clientIP,
       userAgent,
       accion,
       metodo: req.method,
-      endpoint: req.originalUrl
+      endpoint: req.originalUrl,
     });
 
     next();
@@ -60,28 +66,38 @@ router.post("/", async (req, res) => {
     console.log("ðŸ“ Datos recibidos en el backend:", req.body);
 
     // Mapeo de compatibilidad para el frontend legacy
-    const docNum = req.body.numDocumentoIdentificacion || req.body.registroCivil || req.body.cedula;
-    const tipoDoc = req.body.tipoDocumentoIdentificacion || req.body.tipoDocumento || (req.body.cedula ? 'CC' : 'RC');
+    const docNum =
+      req.body.numDocumentoIdentificacion ||
+      req.body.registroCivil ||
+      req.body.cedula;
+    const tipoDoc =
+      req.body.tipoDocumentoIdentificacion ||
+      req.body.tipoDocumento ||
+      (req.body.cedula ? "CC" : "RC");
 
     if (!docNum) {
-      return res.status(400).json({ error: "El nÃºmero de documento es obligatorio" });
+      return res
+        .status(400)
+        .json({ error: "El nÃºmero de documento es obligatorio" });
     }
 
-    const existe = await Paciente.findOne({ numDocumentoIdentificacion: docNum });
+    const existe = await Paciente.findOne({
+      where: { num_documento_identificacion: docNum },
+    });
     if (existe) {
       return res.status(400).json({ error: "El paciente ya existe" });
     }
 
-    // Preparar objeto para el nuevo modelo
+    // Preparar objeto para el nuevo modelo (mapear a snake_case para Sequelize)
     const data = {
       ...req.body,
-      numDocumentoIdentificacion: docNum,
-      tipoDocumentoIdentificacion: tipoDoc,
+      num_documento_identificacion: docNum,
+      tipo_documento_identificacion: tipoDoc,
       // Si no vienen nombres/apellidos separados, intentar separar nombres
       nombres: req.body.nombres,
-      apellidos: req.body.apellidos || (req.body.nombres ? '' : 'SIN APELLIDO'),
+      apellidos: req.body.apellidos || (req.body.nombres ? "" : "SIN APELLIDO"),
       // Sanitizar esAdulto para evitar errores de casteo (especialmente con strings vacÃos)
-      esAdulto: req.body.esAdulto === true || req.body.esAdulto === "true"
+      es_adulto: req.body.esAdulto === true || req.body.esAdulto === "true",
     };
 
     // Mapear datos de contacto si vienen en formato plano (legacy)
@@ -89,65 +105,78 @@ router.post("/", async (req, res) => {
       data.datosContacto = {
         direccion: req.body.direccion,
         telefono: req.body.telefono || req.body.celular,
-        nombreAcompanante: req.body.acompanante || req.body.nombreMadre || req.body.nombrePadre,
-        telefonoAcompanante: req.body.telefonoAcompanante
+        nombreAcompanante:
+          req.body.acompanante || req.body.nombreMadre || req.body.nombrePadre,
+        telefonoAcompanante: req.body.telefonoAcompanante,
       };
     }
 
-    const paciente = new Paciente(data);
-    await paciente.save();
-    res.json({ mensaje: "Paciente registrado correctamente", id: paciente._id });
+    const paciente = await Paciente.create(data);
+    res.json({ mensaje: "Paciente registrado correctamente", id: paciente.id });
   } catch (error) {
     console.error("â Œ Error al registrar paciente:", error);
-    res.status(500).json({ error: error.message || "Error en el servidor", details: error.message });
+    res.status(500).json({
+      error: error.message || "Error en el servidor",
+      details: error.message,
+    });
   }
 });
 
-router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
+router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
   try {
     const { tipo } = req.query;
-    let query = {};
+    let whereClause = {};
 
-    if (tipo === 'nino') {
-      query.esAdulto = false;
-    } else if (tipo === 'adulto') {
-      query.esAdulto = true;
+    if (tipo === "nino") {
+      whereClause.es_adulto = false;
+    } else if (tipo === "adulto") {
+      whereClause.es_adulto = true;
     }
 
-    const pacientes = await Paciente.find(query)
-      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto pediatra nombreMadre nombrePadre ocupacionMadre ocupacionPadre ocupacion peso talla createdAt')
-      .sort({ nombres: 1 });
+    const pacientes = await Paciente.findAll({
+      where: whereClause,
+      order: [["nombres", "ASC"]],
+    });
 
-    console.log(`[DEBUG] Pacientes encontrados: ${pacientes.length} (query: ${JSON.stringify(query)})`);
+    console.log(
+      `[DEBUG] Pacientes encontrados: ${pacientes.length} (query: ${JSON.stringify(whereClause)})`,
+    );
 
-    const mapiado = pacientes.map(p => {
+    const mapiado = pacientes.map((p) => {
       let edad = 0;
-      if (p.fechaNacimiento) {
+      const fechaNac = p.fecha_nacimiento;
+      if (fechaNac) {
         const hoy = new Date();
-        const nacimiento = new Date(p.fechaNacimiento);
+        const nacimiento = new Date(fechaNac);
 
         // Si es niño (RC/TI), calcular edad en meses para el frontend legacy
-        const esNino = !p.esAdulto;
+        const esNino = !p.es_adulto;
         if (esNino) {
-          edad = (hoy.getFullYear() - nacimiento.getFullYear()) * 12 + (hoy.getMonth() - nacimiento.getMonth());
+          edad =
+            (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
+            (hoy.getMonth() - nacimiento.getMonth());
         } else {
           // Si es adulto, edad en años
           edad = hoy.getFullYear() - nacimiento.getFullYear();
-          if (hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
+          if (
+            hoy.getMonth() < nacimiento.getMonth() ||
+            (hoy.getMonth() === nacimiento.getMonth() &&
+              hoy.getDate() < nacimiento.getDate())
+          ) {
             edad--;
           }
         }
       }
 
       return {
-        ...p._doc,
-        registroCivil: p.numDocumentoIdentificacion, // Alias legacy
-        cedula: p.numDocumentoIdentificacion, // Alias legacy
-        genero: p.codSexo,
+        ...p.toJSON(),
+        registroCivil: p.num_documento_identificacion, // Alias legacy
+        cedula: p.num_documento_identificacion, // Alias legacy
+        genero: p.cod_sexo,
         edad: edad,
-        celular: p.datosContacto?.telefono || p.datosContacto?.telefonoAcompanante || "N/A",
-        nombreMadre: p.datosContacto?.nombreAcompanante || p.nombreMadre || "N/A",
-        nombrePadre: p.nombrePadre || "N/A"
+        celular: "N/A", // TODO: agregar campo telefono al modelo
+        nombreMadre: p.nombre_madre || "N/A",
+        nombrePadre: p.nombre_padre || "N/A",
       };
     });
 
@@ -158,135 +187,159 @@ router.get("/", logAccesoMiddleware('LISTAR_PACIENTES'), async (req, res) => {
   }
 });
 
-router.get("/buscar", logAccesoMiddleware('BUSCAR_PACIENTES'), async (req, res) => {
-  const { q, tipo } = req.query;
-  try {
-    if (!q || q.trim() === "") {
-      return res.json([]);
-    }
-
-    let query = {
-      $or: [
-        { nombres: { $regex: q, $options: "i" } },
-        { apellidos: { $regex: q, $options: "i" } },
-        { numDocumentoIdentificacion: { $regex: q, $options: "i" } }
-      ]
-    };
-
-    if (tipo === 'nino') {
-      query.esAdulto = false;
-    } else if (tipo === 'adulto') {
-      query.esAdulto = true;
-    }
-
-    const pacientes = await Paciente.find(query)
-      .select('nombres apellidos numDocumentoIdentificacion tipoDocumentoIdentificacion codSexo fechaNacimiento aseguradora esAdulto semanasGestacion fum estadoEmbarazo datosContacto pediatra nombreMadre nombrePadre ocupacionMadre ocupacionPadre ocupacion peso talla createdAt')
-      .sort({ nombres: 1 })
-      .limit(20);
-
-    const mapiado = pacientes.map(p => {
-      let edad = 0;
-      if (p.fechaNacimiento) {
-        const hoy = new Date();
-        const nacimiento = new Date(p.fechaNacimiento);
-        const esNino = !p.esAdulto;
-        if (esNino) {
-          edad = (hoy.getFullYear() - nacimiento.getFullYear()) * 12 + (hoy.getMonth() - nacimiento.getMonth());
-        } else {
-          edad = hoy.getFullYear() - nacimiento.getFullYear();
-          if (hoy.getMonth() < nacimiento.getMonth() || (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())) {
-            edad--;
-          }
-        }
+router.get(
+  "/buscar",
+  logAccesoMiddleware("BUSCAR_PACIENTES"),
+  async (req, res) => {
+    const { q, tipo } = req.query;
+    try {
+      if (!q || q.trim() === "") {
+        return res.json([]);
       }
 
-      return {
-        ...p._doc,
-        registroCivil: p.numDocumentoIdentificacion,
-        cedula: p.numDocumentoIdentificacion,
-        genero: p.codSexo,
-        edad: edad,
-        celular: p.datosContacto?.telefono || p.datosContacto?.telefonoAcompanante || "N/A"
+      const { Op } = require("sequelize");
+      let whereClause = {
+        [Op.or]: [
+          { nombres: { [Op.iLike]: `%${q}%` } },
+          { apellidos: { [Op.iLike]: `%${q}%` } },
+          { num_documento_identificacion: { [Op.iLike]: `%${q}%` } },
+        ],
       };
-    });
 
-    res.json(mapiado);
-  } catch (e) {
-    console.error("Error en /buscar:", e);
-    res.json([]);
-  }
-});
+      if (tipo === "nino") {
+        whereClause.es_adulto = false;
+      } else if (tipo === "adulto") {
+        whereClause.es_adulto = true;
+      }
+
+      const pacientes = await Paciente.findAll({
+        where: whereClause,
+        order: [["nombres", "ASC"]],
+        limit: 20,
+      });
+
+      const mapiado = pacientes.map((p) => {
+        let edad = 0;
+        const fechaNac = p.fecha_nacimiento;
+        if (fechaNac) {
+          const hoy = new Date();
+          const nacimiento = new Date(fechaNac);
+          const esNino = !p.es_adulto;
+          if (esNino) {
+            edad =
+              (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
+              (hoy.getMonth() - nacimiento.getMonth());
+          } else {
+            edad = hoy.getFullYear() - nacimiento.getFullYear();
+            if (
+              hoy.getMonth() < nacimiento.getMonth() ||
+              (hoy.getMonth() === nacimiento.getMonth() &&
+                hoy.getDate() < nacimiento.getDate())
+            ) {
+              edad--;
+            }
+          }
+        }
+
+        return {
+          ...p.toJSON(),
+          registroCivil: p.num_documento_identificacion,
+          cedula: p.num_documento_identificacion,
+          genero: p.cod_sexo,
+          edad: edad,
+          celular: "N/A",
+        };
+      });
+
+      res.json(mapiado);
+    } catch (e) {
+      console.error("Error en /buscar:", e);
+      res.json([]);
+    }
+  },
+);
 
 router.get("/recientes", async (req, res) => {
   try {
-    const pacientes = await Paciente.find().sort({ createdAt: -1 }).limit(10);
+    const pacientes = await Paciente.findAll({
+      order: [["created_at", "DESC"]],
+      limit: 10,
+    });
     res.json(pacientes);
   } catch (e) {
     res.status(500).json({ error: "Error al obtener pacientes recientes" });
   }
 });
 
-router.get("/:id", logAccesoMiddleware('CONSULTAR_PACIENTE'), async (req, res) => {
-  try {
-    const paciente = await Paciente.findById(req.params.id);
-    if (!paciente) return res.status(404).json({ error: "No encontrado" });
+router.get(
+  "/:id",
+  logAccesoMiddleware("CONSULTAR_PACIENTE"),
+  async (req, res) => {
+    try {
+      const paciente = await Paciente.findByPk(req.params.id);
+      if (!paciente) return res.status(404).json({ error: "No encontrado" });
 
-    // Envolver en compatibilidad
-    const data = {
-      ...paciente._doc,
-      registroCivil: paciente.numDocumentoIdentificacion,
-      cedula: paciente.numDocumentoIdentificacion,
-      genero: paciente.codSexo,
-      direccion: paciente.datosContacto?.direccion,
-      telefono: paciente.datosContacto?.telefono,
-      acompanante: paciente.datosContacto?.nombreAcompanante
-    };
-
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener paciente" });
-  }
-});
-
-router.delete("/:id", logAccesoMiddleware('ELIMINAR_PACIENTE'), async (req, res) => {
-  try {
-    await Paciente.findByIdAndDelete(req.params.id);
-    res.json({ mensaje: "Paciente eliminado correctamente" });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-router.put('/:id', logAccesoMiddleware('ACTUALIZAR_PACIENTE'), async (req, res) => {
-  try {
-    // Al actualizar, tambiÃ©n manejamos la estructura anidada si el frontend manda datos planos
-    const updateData = { ...req.body };
-
-    if (req.body.direccion || req.body.telefono || req.body.celular || req.body.acompanante) {
-      updateData.datosContacto = {
-        direccion: req.body.direccion || (updateData.datosContacto?.direccion),
-        telefono: req.body.telefono || req.body.celular || (updateData.datosContacto?.telefono),
-        nombreAcompanante: req.body.acompanante || (updateData.datosContacto?.nombreAcompanante),
-        telefonoAcompanante: req.body.telefonoAcompanante || (updateData.datosContacto?.telefonoAcompanante)
+      // Envolver en compatibilidad
+      const data = {
+        ...paciente.toJSON(),
+        registroCivil: paciente.num_documento_identificacion,
+        cedula: paciente.num_documento_identificacion,
+        genero: paciente.cod_sexo,
+        direccion: null, // TODO: agregar campo direccion al modelo
+        telefono: null, // TODO: agregar campo telefono al modelo
+        acompanante: paciente.nombre_madre || paciente.nombre_padre,
       };
-    }
 
-    if (req.body.esAdulto !== undefined) {
-      updateData.esAdulto = req.body.esAdulto === true || req.body.esAdulto === "true";
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener paciente" });
     }
+  },
+);
 
-    const actualizado = await Paciente.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
-    if (!actualizado) {
-      return res.status(404).json({ mensaje: 'Paciente no encontrado' });
+router.delete(
+  "/:id",
+  logAccesoMiddleware("ELIMINAR_PACIENTE"),
+  async (req, res) => {
+    try {
+      const paciente = await Paciente.findByPk(req.params.id);
+      if (!paciente)
+        return res.status(404).json({ error: "Paciente no encontrado" });
+      await paciente.destroy();
+      res.json({ mensaje: "Paciente eliminado correctamente" });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
-    res.json({ mensaje: 'Paciente actualizado correctamente', paciente: actualizado });
-  } catch (error) {
-    res.status(500).json({ mensaje: 'Error al actualizar paciente', error });
-  }
-});
+  },
+);
+
+router.put(
+  "/:id",
+  logAccesoMiddleware("ACTUALIZAR_PACIENTE"),
+  async (req, res) => {
+    try {
+      const paciente = await Paciente.findByPk(req.params.id);
+      if (!paciente) {
+        return res.status(404).json({ mensaje: "Paciente no encontrado" });
+      }
+
+      // Al actualizar, tambiÃ©n manejamos la estructura anidada si el frontend manda datos planos
+      const updateData = { ...req.body };
+
+      if (req.body.esAdulto !== undefined) {
+        updateData.es_adulto =
+          req.body.esAdulto === true || req.body.esAdulto === "true";
+      }
+
+      await paciente.update(updateData);
+      res.json({
+        mensaje: "Paciente actualizado correctamente",
+        paciente: paciente.toJSON(),
+      });
+    } catch (error) {
+      res.status(500).json({ mensaje: "Error al actualizar paciente", error });
+    }
+  },
+);
 
 module.exports = router;

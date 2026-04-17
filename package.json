@@ -3,7 +3,13 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "migrate": "node scripts/migrate-mongo-to-postgres.js",
+    "sync-db": "node scripts/sync-database.js",
+    "remigrar-valoraciones": "node scripts/remigrar-valoraciones-fallidas.js",
+    "update-usuarios": "node scripts/update-usuarios.js"
   },
   "keywords": [],
   "author": "",
@@ -26,9 +32,13 @@
     "multer-s3": "^3.0.1",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.1",
+    "pg": "^8.14.1",
+    "pg-hstore": "^2.3.4",
     "pizzip": "^3.2.0",
     "qrcode": "^1.5.4",
+    "sequelize": "^6.37.7",
     "speakeasy": "^2.0.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
   }
 }
