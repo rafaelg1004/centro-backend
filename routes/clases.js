@@ -1,13 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const Clase = require("../models/Clase");
-const PagoPaquete = require("../models/PagoPaquete");
+const {
+  Clase,
+  ClaseNino,
+  PagoPaquete,
+  Paciente,
+} = require("../models-sequelize");
+const { Op } = require("sequelize");
 
 // Crear clase
 router.post("/", async (req, res) => {
   try {
-    const clase = new Clase(req.body);
-    await clase.save();
+    const clase = await Clase.create(req.body);
     res.json(clase);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -18,31 +22,64 @@ router.post("/", async (req, res) => {
 router.post("/:id/agregar-nino", async (req, res) => {
   try {
     const { ninoId, numeroFactura } = req.body;
-    const clase = await Clase.findById(req.params.id);
+    const clase = await Clase.findByPk(req.params.id);
+    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
 
     // Evita duplicados
-    if (!clase.ninos.some(n => n.nino.toString() === ninoId)) {
+    const existeNino = await ClaseNino.findOne({
+      where: { clase_id: req.params.id, paciente_id: ninoId },
+    });
+
+    if (!existeNino) {
       // Si hay numeroFactura, validar y descontar clase
       if (numeroFactura) {
-        const paquete = await PagoPaquete.findOne({ numeroFactura });
-        if (!paquete) return res.status(404).json({ error: "Factura no encontrada" });
+        const paquete = await PagoPaquete.findOne({
+          where: { numero_factura: numeroFactura },
+        });
+        if (!paquete)
+          return res.status(404).json({ error: "Factura no encontrada" });
 
-        if (paquete.clasesUsadas >= paquete.clasesPagadas) {
-          return res.status(400).json({ error: "No quedan clases disponibles en este paquete" });
+        if (paquete.clases_usadas >= paquete.clases_pagadas) {
+          return res
+            .status(400)
+            .json({ error: "No quedan clases disponibles en este paquete" });
         }
 
-        paquete.clasesUsadas += 1;
-        await paquete.save();
+        await paquete.update({ clases_usadas: paquete.clases_usadas + 1 });
 
-        // Agregar el niño con el número de factura
-        clase.ninos.push({ nino: ninoId, numeroFactura });
+        // Crear relación clase-niño con factura
+        await ClaseNino.create({
+          clase_id: req.params.id,
+          paciente_id: ninoId,
+          numero_factura: numeroFactura,
+        });
       } else {
-        // Agregar el niño sin paquete (se mostrará en rojo)
-        clase.ninos.push({ nino: ninoId, numeroFactura: null });
+        // Crear relación clase-niño sin factura
+        await ClaseNino.create({
+          clase_id: req.params.id,
+          paciente_id: ninoId,
+          numero_factura: null,
+        });
       }
-      await clase.save();
     }
-    res.json(clase);
+
+    // Retornar clase con niños actualizados
+    const claseActualizada = await Clase.findByPk(req.params.id, {
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+          include: [
+            {
+              model: Paciente,
+              as: "paciente",
+              attributes: ["id", "nombres", "apellidos"],
+            },
+          ],
+        },
+      ],
+    });
+    res.json(claseActualizada);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -52,32 +89,56 @@ router.post("/:id/agregar-nino", async (req, res) => {
 router.post("/:id/asignar-paquete", async (req, res) => {
   try {
     const { ninoId, numeroFactura } = req.body;
-    const clase = await Clase.findById(req.params.id);
+    const clase = await Clase.findByPk(req.params.id);
+    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
 
     // Buscar el niño en la clase
-    const ninoClase = clase.ninos.find(n => n.nino.toString() === ninoId);
-    if (!ninoClase) return res.status(404).json({ error: "Niño no encontrado en la clase" });
+    const ninoClase = await ClaseNino.findOne({
+      where: { clase_id: req.params.id, paciente_id: ninoId },
+    });
+    if (!ninoClase)
+      return res.status(404).json({ error: "Niño no encontrado en la clase" });
 
     // Verificar que no tenga ya un paquete asignado
-    if (ninoClase.numeroFactura) {
-      return res.status(400).json({ error: "Este niño ya tiene un paquete asignado" });
+    if (ninoClase.numero_factura) {
+      return res
+        .status(400)
+        .json({ error: "Este niño ya tiene un paquete asignado" });
     }
 
     // Validar el paquete
-    const paquete = await PagoPaquete.findOne({ numeroFactura });
-    if (!paquete) return res.status(404).json({ error: "Factura no encontrada" });
+    const paquete = await PagoPaquete.findOne({
+      where: { numero_factura: numeroFactura },
+    });
+    if (!paquete)
+      return res.status(404).json({ error: "Factura no encontrada" });
 
-    if (paquete.clasesUsadas >= paquete.clasesPagadas) {
-      return res.status(400).json({ error: "No quedan clases disponibles en este paquete" });
+    if (paquete.clases_usadas >= paquete.clases_pagadas) {
+      return res
+        .status(400)
+        .json({ error: "No quedan clases disponibles en este paquete" });
     }
 
     // Asignar el paquete y descontar una clase
-    ninoClase.numeroFactura = numeroFactura;
-    paquete.clasesUsadas += 1;
-    await paquete.save();
-    await clase.save();
+    await ninoClase.update({ numero_factura: numeroFactura });
+    await paquete.update({ clases_usadas: paquete.clases_usadas + 1 });
 
-    res.json(clase);
+    const claseActualizada = await Clase.findByPk(req.params.id, {
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+          include: [
+            {
+              model: Paciente,
+              as: "paciente",
+              attributes: ["id", "nombres", "apellidos"],
+            },
+          ],
+        },
+      ],
+    });
+    res.json(claseActualizada);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -86,19 +147,39 @@ router.post("/:id/asignar-paquete", async (req, res) => {
 // Guardar firma de un niño
 router.post("/:id/firma-nino", async (req, res) => {
   try {
-    const { obtenerMetadatosPista } = require('../utils/auditUtils');
-    const clase = await Clase.findById(req.params.id);
-    if (clase.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+    const { obtenerMetadatosPista } = require("../utils/auditUtils");
+    const clase = await Clase.findByPk(req.params.id);
+    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
+    if (clase.bloqueada)
+      return res.status(403).json({ error: "Clase bloqueada" });
 
-    const nino = clase.ninos.find(n => n.nino.toString() === req.body.ninoId);
-    if (nino) {
-      nino.firma = req.body.firma;
-      nino.auditTrail = obtenerMetadatosPista(req);
-      await clase.save();
-      res.json(clase);
-    } else {
-      res.status(404).json({ error: "Niño no encontrado en la clase" });
-    }
+    const ninoClase = await ClaseNino.findOne({
+      where: { clase_id: req.params.id, paciente_id: req.body.ninoId },
+    });
+    if (!ninoClase)
+      return res.status(404).json({ error: "Niño no encontrado en la clase" });
+
+    await ninoClase.update({
+      firma: req.body.firma,
+      audit_trail: obtenerMetadatosPista(req),
+    });
+
+    const claseActualizada = await Clase.findByPk(req.params.id, {
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+          include: [
+            {
+              model: Paciente,
+              as: "paciente",
+              attributes: ["id", "nombres", "apellidos"],
+            },
+          ],
+        },
+      ],
+    });
+    res.json(claseActualizada);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -110,35 +191,38 @@ router.get("/", async (req, res) => {
     const { fechaInicio, fechaFin, busqueda } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    let query = {};
+    let whereClause = {};
 
     // Filtros de fecha
     if (fechaInicio || fechaFin) {
-      query.fecha = {};
-      if (fechaInicio) query.fecha.$gte = fechaInicio;
-      if (fechaFin) query.fecha.$lte = fechaFin;
+      whereClause.fecha = {};
+      if (fechaInicio) whereClause.fecha[Op.gte] = fechaInicio;
+      if (fechaFin) whereClause.fecha[Op.lte] = fechaFin;
     }
 
-    // Filtro de búsqueda por nombre si se proporciona (opcional, para hacerlo en el servidor)
+    // Filtro de búsqueda por nombre
     if (busqueda) {
-      query.nombre = { $regex: busqueda, $options: "i" };
+      whereClause.nombre = { [Op.iLike]: `%${busqueda}%` };
     }
 
-    const total = await Clase.countDocuments(query);
-    const clases = await Clase.find(query)
-      .populate("ninos.nino", "nombres apellidos numDocumentoIdentificacion genero") // Solo campos básicos del niño
-      .select("-ninos.firma") // Excluir firmas en el listado masivo
-      .sort({ fecha: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit);
+    const total = await Clase.count({ where: whereClause });
+    const clases = await Clase.findAll({
+      where: whereClause,
+      order: [
+        ["fecha", "DESC"],
+        ["id", "DESC"],
+      ],
+      offset,
+      limit,
+    });
 
     res.json({
       data: clases,
       total,
       page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     });
   } catch (e) {
     console.error("Error al obtener clases:", e);
@@ -149,7 +233,20 @@ router.get("/", async (req, res) => {
 // Obtener una clase por ID
 router.get("/:id", async (req, res) => {
   try {
-    const clase = await Clase.findById(req.params.id).populate("ninos.nino");
+    const clase = await Clase.findByPk(req.params.id, {
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+          include: [
+            {
+              model: Paciente,
+              as: "paciente",
+            },
+          ],
+        },
+      ],
+    });
     if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
     res.json(clase);
   } catch (e) {
@@ -160,43 +257,64 @@ router.get("/:id", async (req, res) => {
 // Guardar firma al finalizar clase (opcional, si quieres una firma general)
 router.post("/:id/firma", async (req, res) => {
   try {
-    const { obtenerMetadatosPista } = require('../utils/auditUtils');
-    const clase = await Clase.findById(req.params.id);
-    if (clase.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+    const { obtenerMetadatosPista } = require("../utils/auditUtils");
+    const clase = await Clase.findByPk(req.params.id);
+    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
+    if (clase.bloqueada)
+      return res.status(403).json({ error: "Clase bloqueada" });
 
-    clase.firma = req.body.firma;
-    clase.auditTrail = obtenerMetadatosPista(req);
-    await clase.save();
-    res.json(clase);
+    await clase.update({
+      firma: req.body.firma,
+      audit_trail: obtenerMetadatosPista(req),
+    });
+    res.json(clase.toJSON());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-
 router.post("/:id/eliminar-nino", async (req, res) => {
   try {
     const { ninoId } = req.body;
-    const clase = await Clase.findById(req.params.id);
+    const clase = await Clase.findByPk(req.params.id);
+    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
 
     // Busca el niño en la clase
-    const ninoClase = clase.ninos.find(n => n.nino.toString() === ninoId);
-    if (!ninoClase) return res.status(404).json({ error: "Niño no encontrado en la clase" });
+    const ninoClase = await ClaseNino.findOne({
+      where: { clase_id: req.params.id, paciente_id: ninoId },
+    });
+    if (!ninoClase)
+      return res.status(404).json({ error: "Niño no encontrado en la clase" });
 
     // Si tiene factura, resta una clase usada
-    if (ninoClase.numeroFactura) {
-      const paquete = await PagoPaquete.findOne({ numeroFactura: ninoClase.numeroFactura });
-      if (paquete && paquete.clasesUsadas > 0) {
-        paquete.clasesUsadas -= 1;
-        await paquete.save();
+    if (ninoClase.numero_factura) {
+      const paquete = await PagoPaquete.findOne({
+        where: { numero_factura: ninoClase.numero_factura },
+      });
+      if (paquete && paquete.clases_usadas > 0) {
+        await paquete.update({ clases_usadas: paquete.clases_usadas - 1 });
       }
     }
 
     // Elimina el niño de la clase
-    clase.ninos = clase.ninos.filter(n => n.nino.toString() !== ninoId);
-    await clase.save();
+    await ninoClase.destroy();
 
-    res.json(clase);
+    const claseActualizada = await Clase.findByPk(req.params.id, {
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+          include: [
+            {
+              model: Paciente,
+              as: "paciente",
+              attributes: ["id", "nombres", "apellidos"],
+            },
+          ],
+        },
+      ],
+    });
+    res.json(claseActualizada);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -205,21 +323,31 @@ router.post("/:id/eliminar-nino", async (req, res) => {
 // Eliminar una clase por ID
 router.delete("/:id", async (req, res) => {
   try {
-    const clase = await Clase.findById(req.params.id);
+    const clase = await Clase.findByPk(req.params.id);
     if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
 
-    // Por cada niño, si tiene numeroFactura, resta 1 a clasesUsadas en el paquete
-    for (const ninoClase of clase.ninos) {
-      if (ninoClase.numeroFactura) {
-        const paquete = await PagoPaquete.findOne({ numeroFactura: ninoClase.numeroFactura });
-        if (paquete && paquete.clasesUsadas > 0) {
-          paquete.clasesUsadas -= 1;
-          await paquete.save();
+    // Obtener todos los niños de la clase
+    const ninosClase = await ClaseNino.findAll({
+      where: { clase_id: req.params.id },
+    });
+
+    // Por cada niño, si tiene numero_factura, resta 1 a clases_usadas en el paquete
+    for (const ninoClase of ninosClase) {
+      if (ninoClase.numero_factura) {
+        const paquete = await PagoPaquete.findOne({
+          where: { numero_factura: ninoClase.numero_factura },
+        });
+        if (paquete && paquete.clases_usadas > 0) {
+          await paquete.update({ clases_usadas: paquete.clases_usadas - 1 });
         }
       }
     }
 
-    await Clase.findByIdAndDelete(req.params.id);
+    // Eliminar todas las relaciones clase-niño
+    await ClaseNino.destroy({ where: { clase_id: req.params.id } });
+
+    // Eliminar la clase
+    await clase.destroy();
     res.json({ mensaje: "Clase eliminada correctamente" });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -229,9 +357,65 @@ router.delete("/:id", async (req, res) => {
 // Ruta para buscar clases donde está inscrito un paciente
 router.get("/paciente/:id", async (req, res) => {
   try {
-    const clases = await Clase.find({ "ninos.nino": req.params.id });
+    const pacienteId = req.params.id;
+    console.log(`[DEBUG] Buscando clases para paciente: ${pacienteId}`);
+
+    // Buscar todas las relaciones clase-niño para este paciente
+    const relaciones = await ClaseNino.findAll({
+      where: { paciente_id: pacienteId },
+      include: [
+        {
+          model: Clase,
+          as: "clase",
+          include: [
+            {
+              model: ClaseNino,
+              as: "clase_ninos", // Usar clase_ninos en lugar de ninos
+              include: [
+                {
+                  model: Paciente,
+                  as: "paciente",
+                  attributes: ["id", "nombres", "apellidos"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    console.log(`[DEBUG] Relaciones encontradas: ${relaciones.length}`);
+
+    // Mapear al formato esperado por el frontend (n.nino en lugar de n.paciente)
+    const clases = relaciones
+      .map((r) => {
+        const clase = r.clase?.toJSON();
+        if (!clase) {
+          console.log(`[DEBUG] Relación sin clase:`, r.toJSON());
+          return null;
+        }
+
+        // Transformar clase_ninos para que tengan nino en lugar de paciente
+        if (clase.clase_ninos) {
+          clase.ninos = clase.clase_ninos.map((n) => ({
+            ...n,
+            numero_factura: n.numero_factura,
+            nino: n.paciente, // Agregar alias nino para compatibilidad con frontend
+          }));
+          delete clase.clase_ninos; // Eliminar el campo original
+        }
+
+        console.log(
+          `[DEBUG] Clase procesada: ${clase.id} - ${clase.nombre}, ninos: ${clase.ninos?.length || 0}`,
+        );
+        return clase;
+      })
+      .filter((c) => c !== null);
+
+    console.log(`[DEBUG] Total clases a devolver: ${clases.length}`);
     res.json(clases);
   } catch (e) {
+    console.error("[DEBUG] Error al buscar clases del paciente:", e);
     res.status(500).json({ error: "Error al buscar clases del paciente" });
   }
 });
@@ -239,24 +423,30 @@ router.get("/paciente/:id", async (req, res) => {
 // Editar (actualizar) una clase por ID
 router.put("/:id", async (req, res) => {
   try {
-    const { generarHash, obtenerMetadatosPista } = require('../utils/auditUtils');
-    const claseActual = await Clase.findById(req.params.id);
-    if (!claseActual) return res.status(404).json({ error: "Clase no encontrada" });
-    if (claseActual.bloqueada) return res.status(403).json({ error: "Clase bloqueada" });
+    const {
+      generarHash,
+      obtenerMetadatosPista,
+    } = require("../utils/auditUtils");
+    const claseActual = await Clase.findByPk(req.params.id);
+    if (!claseActual)
+      return res.status(404).json({ error: "Clase no encontrada" });
+    if (claseActual.bloqueada)
+      return res.status(403).json({ error: "Clase bloqueada" });
+
+    const updateData = { ...req.body };
 
     // Si se está bloqueando el registro
     if (req.body.bloqueada && !claseActual.bloqueada) {
-      req.body.fechaBloqueo = new Date();
-      req.body.selloIntegridad = generarHash({
+      updateData.fecha_bloqueo = new Date();
+      updateData.sello_integridad = generarHash({
         contenido: req.body,
-        auditTrail: req.body.auditTrail || claseActual.auditTrail,
-        ninos: req.body.ninos || claseActual.ninos,
-        fechaBloqueo: req.body.fechaBloqueo
+        auditTrail: req.body.audit_trail || claseActual.audit_trail,
+        fechaBloqueo: updateData.fecha_bloqueo,
       });
     }
 
-    const clase = await Clase.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(clase);
+    await claseActual.update(updateData);
+    res.json(claseActual.toJSON());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

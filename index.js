@@ -47,6 +47,11 @@ app.use("/api", require("./routes/proxyImages"));
 // Legacy Health Check redirect
 app.get("/api/health", (req, res) => res.redirect("/api/system/health"));
 
+// Health check para despliegue (root path)
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // === Rutas Protegidas (Requieren Token JWT) ===
 const { verificarToken } = require("./routes/auth");
 

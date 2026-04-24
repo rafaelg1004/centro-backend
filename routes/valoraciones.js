@@ -307,6 +307,18 @@ router.get(
       const total = await ValoracionFisioterapia.count({ where: whereClause });
       const valoraciones = await ValoracionFisioterapia.findAll({
         where: whereClause,
+        include: [
+          {
+            model: Paciente,
+            as: "paciente",
+            attributes: [
+              "id",
+              "nombres",
+              "apellidos",
+              "num_documento_identificacion",
+            ],
+          },
+        ],
         order: [["created_at", "DESC"]],
         offset: skip,
         limit: parseInt(limite),
@@ -345,8 +357,8 @@ router.get(
 
       const mapiado = await Promise.all(
         valoraciones.map(async (v) => {
-          // Prioridad absoluta al campo tipoPrograma si existe
-          let tipo = v.tipoPrograma || null;
+          // Prioridad absoluta al campo tipo_programa si existe
+          let tipo = v.tipo_programa || null;
 
           if (!tipo) {
             // Detectar tipo basándose en contenido REAL de los módulos
@@ -357,43 +369,46 @@ router.get(
             } else if (tieneModuloPoblado(v.modulo_piso_pelvico)) {
               tipo = "Piso Pélvico";
             }
-            // Fallback por codConsulta (retrocompatibilidad)
-            else if (v.codConsulta === "890204") {
+            // Fallback por cod_consulta (retrocompatibilidad)
+            else if (v.cod_consulta === "890204") {
               tipo = "Perinatal";
-            } else if (v.codConsulta === "890202") {
+            } else if (v.cod_consulta === "890202") {
               tipo = "Piso Pélvico";
             } else {
-              tipo = v.codConsulta === "890201" ? "Pediatría" : "General";
+              tipo = v.cod_consulta === "890201" ? "Pediatría" : "General";
             }
           }
 
           // Si es perinatal, adjuntar información de progreso de sesiones independientes
           let sesionesIndependientes = [];
-          if (v.codConsulta === "890204") {
-            const rawSesiones = await EvolucionSesion.find({
-              valoracionAsociada: v._id,
-            }).lean();
+          if (v.cod_consulta === "890204") {
+            const rawSesiones = await EvolucionSesion.findAll({
+              where: { valoracion_id: v.id },
+              raw: true,
+            });
             // Aliasing para retrocompatibilidad con la UI de arrays
             sesionesIndependientes = rawSesiones.map((s) => ({
               ...s,
               firmaPaciente: s.firmas?.paciente?.firmaUrl,
-              nombre: s.descripcionEvolucion,
-              fecha: s.fechaInicioAtencion,
+              nombre: s.descripcion_evolucion,
+              fecha: s.fecha_inicio_atencion,
             }));
           }
 
+          const vJson = v.toJSON ? v.toJSON() : v;
+
           return {
-            ...v._doc,
+            ...vJson,
             tipo,
             sesiones: sesionesIndependientes.filter(
               (s) =>
-                !s.descripcionEvolucion?.includes("Intensivo") &&
-                !s.descripcionEvolucion?.includes("Físico"),
+                !s.descripcion_evolucion?.includes("Intensivo") &&
+                !s.descripcion_evolucion?.includes("Físico"),
             ),
             sesionesIntensivo: sesionesIndependientes.filter(
               (s) =>
-                s.descripcionEvolucion?.includes("Intensivo") ||
-                s.descripcionEvolucion?.includes("Físico"),
+                s.descripcion_evolucion?.includes("Intensivo") ||
+                s.descripcion_evolucion?.includes("Físico"),
             ),
           };
         }),
@@ -490,16 +505,28 @@ router.get("/paciente/:pacienteId", async (req, res) => {
 
     const mapiado = await Promise.all(
       valoraciones.map(async (v) => {
-        let tipo = v.tipoPrograma || null;
+        let tipo = null;
         let ruta = "/valoraciones/";
 
+        // Priorizar cod_consulta sobre tipoPrograma para mayor precisión
+        if (v.cod_consulta === "890204") tipo = "Perinatal";
+        else if (v.cod_consulta === "890202") tipo = "Piso Pélvico";
+        else if (v.cod_consulta === "890201") tipo = "Pediatría";
+        else if (v.cod_consulta === "890203") tipo = "Lactancia";
+        else if (v.tipoPrograma) {
+          // Usar tipoPrograma solo si cod_consulta no está definido
+          if (v.tipoPrograma.includes("Lactancia")) tipo = "Lactancia";
+          else if (v.tipoPrograma.includes("Piso")) tipo = "Piso Pélvico";
+          else if (v.tipoPrograma === "Perinatal") tipo = "Perinatal";
+          else if (v.tipoPrograma === "Pediatría") tipo = "Pediatría";
+        }
+
+        // Si aún no hay tipo, revisar módulos poblados
         if (!tipo) {
           if (tmpPop(v.modulo_lactancia)) tipo = "Lactancia";
           else if (tmpPop(v.modulo_pediatria)) tipo = "Pediatría";
           else if (tmpPop(v.modulo_piso_pelvico)) tipo = "Piso Pélvico";
-          else if (v.cod_consulta === "890204") tipo = "Perinatal";
-          else if (v.cod_consulta === "890202") tipo = "Piso Pélvico";
-          else if (v.cod_consulta === "890201") tipo = "Pediatría";
+          else if (tmpPop(v.modulo_perinatal)) tipo = "Perinatal";
           else tipo = "General";
         }
 
@@ -511,7 +538,7 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         let sesionesIndependientes = [];
         if (v.cod_consulta === "890204") {
           const rawSesiones = await EvolucionSesion.findAll({
-            where: { valoracion_asociada_id: v.id },
+            where: { valoracion_id: v.id },
           });
           sesionesIndependientes = rawSesiones.map((s) => ({
             ...s.toJSON(),
@@ -553,15 +580,63 @@ router.get(
   logAccesoValoracionMiddleware("CONSULTAR_VALORACION"),
   async (req, res) => {
     try {
+      // Obtener valoración sin include para evitar problemas de asociación
       const valoracion = await ValoracionFisioterapia.findByPk(req.params.id);
       if (!valoracion) return res.status(404).json({ error: "No encontrada" });
 
       const obj = valoracion.toJSON();
 
+      // Obtener paciente por separado usando paciente_id
+      console.log("[DEBUG] Valoracion paciente_id:", obj.paciente_id);
+      if (obj.paciente_id) {
+        try {
+          const paciente = await Paciente.findByPk(obj.paciente_id, {
+            attributes: [
+              "id",
+              "nombres",
+              "apellidos",
+              "tipo_documento_identificacion",
+              "num_documento_identificacion",
+              "fecha_nacimiento",
+              "cod_sexo",
+              "aseguradora",
+              "pediatra",
+              "peso",
+              "talla",
+              "nombre_madre",
+              "edad_madre",
+              "ocupacion_madre",
+              "nombre_padre",
+              "edad_padre",
+              "ocupacion_padre",
+              "datos_contacto",
+              "es_adulto",
+            ],
+          });
+          console.log("[DEBUG] Paciente encontrado:", paciente ? "SÍ" : "NO");
+          if (paciente) {
+            const pacienteData = paciente.toJSON();
+            // Combinar nombres y apellidos para crear nombre_completo
+            obj.paciente = {
+              ...pacienteData,
+              nombre_completo:
+                `${pacienteData.nombres || ""} ${pacienteData.apellidos || ""}`.trim(),
+            };
+            console.log(
+              "[DEBUG] Paciente datos:",
+              JSON.stringify(obj.paciente, null, 2),
+            );
+          }
+        } catch (pacienteError) {
+          console.error("Error al obtener paciente:", pacienteError);
+          // No fallar si no se puede obtener el paciente
+        }
+      }
+
       // Inyectar sesiones si es perinatal
       if (obj.cod_consulta === "890204") {
         const rawSesiones = await EvolucionSesion.findAll({
-          where: { valoracion_asociada_id: obj.id },
+          where: { valoracion_id: obj.id },
         });
         const sesionesMapeadas = rawSesiones.map((s) => ({
           ...s.toJSON(),

@@ -1,20 +1,25 @@
 /**
  * RUTA LEGACY: /api/sesiones-perinatal
- * 
+ *
  * Proxy de compatibilidad hacia el modelo unificado `EvolucionSesion`.
  */
 const express = require("express");
 const router = express.Router();
-const EvolucionSesion = require("../models/EvolucionSesion");
-const ValoracionFisioterapia = require("../models/ValoracionFisioterapia");
+const {
+  EvolucionSesion,
+  ValoracionFisioterapia,
+} = require("../models-sequelize");
+const { Op } = require("sequelize");
 
-const CUPS_PERINATAL = '890204';
+const CUPS_PERINATAL = "890204";
 
 // Obtener todas las sesiones de un paciente
 router.get("/paciente/:id", async (req, res) => {
   try {
-    const sesiones = await EvolucionSesion.find({ paciente: req.params.id })
-      .sort({ createdAt: 1 });
+    const sesiones = await EvolucionSesion.findAll({
+      where: { paciente_id: req.params.id },
+      order: [["created_at", "ASC"]],
+    });
     res.json(sesiones);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -24,41 +29,50 @@ router.get("/paciente/:id", async (req, res) => {
 // Crear nueva sesión perinatal
 router.post("/", async (req, res) => {
   try {
-    const { paciente, nombreSesion, fecha, firmaPaciente, valoracionAsociada } = req.body;
+    const { paciente, nombreSesion, fecha, firmaPaciente, valoracionAsociada } =
+      req.body;
 
-    if (!paciente) return res.status(400).json({ error: "El paciente es obligatorio" });
+    if (!paciente)
+      return res.status(400).json({ error: "El paciente es obligatorio" });
 
     // Si no se envía valoración asociada, buscar la más reciente del paciente
     let vId = valoracionAsociada;
     if (!vId) {
-      const valAsoc = await ValoracionFisioterapia.findOne({ paciente }).sort({ createdAt: -1 });
-      vId = valAsoc?._id;
+      const valAsoc = await ValoracionFisioterapia.findOne({
+        where: { paciente_id: paciente },
+        order: [["created_at", "DESC"]],
+      });
+      vId = valAsoc?.id;
     }
 
     if (!vId) {
-      return res.status(400).json({ error: "No se encontró valoración asociada para el paciente" });
+      return res
+        .status(400)
+        .json({ error: "No se encontró valoración asociada para el paciente" });
     }
 
-    const totalSesiones = await EvolucionSesion.countDocuments({ paciente, codProcedimiento: CUPS_PERINATAL });
+    const totalSesiones = await EvolucionSesion.count({
+      where: { paciente_id: paciente, cod_procedimiento: CUPS_PERINATAL },
+    });
 
-    const nuevaSesion = new EvolucionSesion({
-      valoracionAsociada: vId,
-      paciente,
-      fechaInicioAtencion: fecha ? new Date(fecha) : new Date(),
-      codProcedimiento: CUPS_PERINATAL,
-      finalidadTecnologiaSalud: '44',
-      codDiagnosticoPrincipal: 'Z348',
-      numeroSesion: totalSesiones + 1,
-      descripcionEvolucion: nombreSesion || `Sesión perinatal ${totalSesiones + 1}`,
+    const guardada = await EvolucionSesion.create({
+      valoracion_asociada_id: vId,
+      paciente_id: paciente,
+      fecha_inicio_atencion: fecha ? new Date(fecha) : new Date(),
+      cod_procedimiento: CUPS_PERINATAL,
+      finalidad_tecnologia_salud: "44",
+      cod_diagnostico_principal: "Z348",
+      numero_sesion: totalSesiones + 1,
+      descripcion_evolucion:
+        nombreSesion || `Sesión perinatal ${totalSesiones + 1}`,
       firmas: {
         paciente: {
           firmaUrl: firmaPaciente,
-          timestamp: new Date()
-        }
-      }
+          timestamp: new Date(),
+        },
+      },
     });
 
-    const guardada = await nuevaSesion.save();
     res.status(201).json(guardada);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -68,33 +82,40 @@ router.post("/", async (req, res) => {
 // Actualizar una sesión
 router.put("/:id", async (req, res) => {
   try {
-    const { generarHash, obtenerMetadatosPista } = require('../utils/auditUtils');
-    const sesionActual = await EvolucionSesion.findById(req.params.id);
-    if (!sesionActual) return res.status(404).json({ error: "Sesión no encontrada" });
-    if (sesionActual.bloqueada) return res.status(403).json({ error: "Sesión bloqueada" });
+    const { generarHash } = require("../utils/auditUtils");
+    const sesionActual = await EvolucionSesion.findByPk(req.params.id);
+    if (!sesionActual)
+      return res.status(404).json({ error: "Sesión no encontrada" });
+    if (sesionActual.bloqueada)
+      return res.status(403).json({ error: "Sesión bloqueada" });
 
     const updateData = { ...req.body };
 
     // Detectar nueva firma del paciente o eliminación
-    if (req.body.firmaPaciente !== undefined && req.body.firmaPaciente !== sesionActual.firmas?.paciente?.firmaUrl) {
-      updateData['firmas.paciente.firmaUrl'] = req.body.firmaPaciente;
-      if (req.body.firmaPaciente) {
-        updateData['firmas.paciente.timestamp'] = new Date();
-        updateData['firmas.paciente.ip'] = req.ip;
-      }
+    const firmas = sesionActual.firmas || {};
+    if (
+      req.body.firmaPaciente !== undefined &&
+      req.body.firmaPaciente !== firmas.paciente?.firmaUrl
+    ) {
+      firmas.paciente = {
+        firmaUrl: req.body.firmaPaciente,
+        timestamp: req.body.firmaPaciente ? new Date() : null,
+        ip: req.body.firmaPaciente ? req.ip : null,
+      };
+      updateData.firmas = firmas;
     }
 
     // Sello de integridad
     if (req.body.bloqueada && !sesionActual.bloqueada) {
-      updateData.fechaBloqueo = new Date();
-      updateData.selloIntegridad = generarHash({
+      updateData.fecha_bloqueo = new Date();
+      updateData.sello_integridad = generarHash({
         contenido: req.body,
-        fechaBloqueo: updateData.fechaBloqueo
+        fechaBloqueo: updateData.fecha_bloqueo,
       });
     }
 
-    const sesion = await EvolucionSesion.findByIdAndUpdate(req.params.id, updateData, { new: true });
-    res.json(sesion);
+    await sesionActual.update(updateData);
+    res.json(sesionActual.toJSON());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -103,11 +124,14 @@ router.put("/:id", async (req, res) => {
 // Eliminar sesión
 router.delete("/:id", async (req, res) => {
   try {
-    const sesion = await EvolucionSesion.findById(req.params.id);
+    const sesion = await EvolucionSesion.findByPk(req.params.id);
     if (!sesion) return res.status(404).json({ error: "No encontrada" });
-    if (sesion.bloqueada) return res.status(403).json({ error: "Sesión bloqueada, no se puede eliminar" });
+    if (sesion.bloqueada)
+      return res
+        .status(403)
+        .json({ error: "Sesión bloqueada, no se puede eliminar" });
 
-    await EvolucionSesion.findByIdAndDelete(req.params.id);
+    await sesion.destroy();
     res.json({ mensaje: "Sesión eliminada correctamente" });
   } catch (error) {
     res.status(500).json({ error: error.message });

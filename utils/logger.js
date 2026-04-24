@@ -1,4 +1,4 @@
-const Log = require('../models/Log');
+const { Log } = require("../models-sequelize");
 
 /**
  * Logger utility para el sistema de salud
@@ -10,37 +10,37 @@ class Logger {
       ERROR: 0,
       WARN: 1,
       INFO: 2,
-      DEBUG: 3
+      DEBUG: 3,
     };
-    this.currentLevel = process.env.LOG_LEVEL || 'INFO';
+    this.currentLevel = process.env.LOG_LEVEL || "INFO";
   }
 
   /**
    * Log a nivel ERROR
    */
   error(category, action, data = {}) {
-    this.log('ERROR', category, action, data);
+    this.log("ERROR", category, action, data);
   }
 
   /**
    * Log a nivel WARN
    */
   warn(category, action, data = {}) {
-    this.log('WARN', category, action, data);
+    this.log("WARN", category, action, data);
   }
 
   /**
    * Log a nivel INFO
    */
   info(category, action, data = {}) {
-    this.log('INFO', category, action, data);
+    this.log("INFO", category, action, data);
   }
 
   /**
    * Log a nivel DEBUG
    */
   debug(category, action, data = {}) {
-    this.log('DEBUG', category, action, data);
+    this.log("DEBUG", category, action, data);
   }
 
   /**
@@ -52,48 +52,44 @@ class Logger {
       return;
     }
 
-    let pacienteId = null;
-    if (data.paciente && /^[0-9a-fA-F]{24}$/.test(data.paciente)) {
-      pacienteId = data.paciente;
-    }
-
     const logData = {
       level,
       category,
       action,
-      user: data.user || 'desconocido',
-      paciente: pacienteId,
-      valoracion: data.valoracion || 'desconocido',
+      username: data.user || "desconocido",
+      paciente_id: data.paciente || null,
+      valoracion_id: data.valoracion || "desconocido",
       details: data.details || {},
-      ip: data.ip || '',
-      userAgent: data.userAgent || ''
+      ip: data.ip || "",
+      user_agent: data.userAgent || "",
     };
 
     // Formato para consola
-    const consoleMessage = `[${new Date().toISOString()}] ${level} [${category}]: ${action} - Usuario: ${logData.user} - Paciente: ${data.paciente || 'desconocido'} - Valoración: ${logData.valoracion}`;
+    const consoleMessage = `[${new Date().toISOString()}] ${level} [${category}]: ${action} - Usuario: ${logData.username} - Paciente: ${data.paciente || "desconocido"} - Valoración: ${logData.valoracion_id}`;
 
     // Log en consola
     switch (level) {
-      case 'ERROR':
+      case "ERROR":
         console.error(`🔴 ${consoleMessage}`, logData.details);
         break;
-      case 'WARN':
+      case "WARN":
         console.warn(`🟡 ${consoleMessage}`, logData.details);
         break;
-      case 'INFO':
+      case "INFO":
         console.log(`📋 ${consoleMessage}`, logData.details);
         break;
-      case 'DEBUG':
+      case "DEBUG":
         console.debug(`🔵 ${consoleMessage}`, logData.details);
         break;
     }
 
-    // Guardar en base de datos (de forma asíncrona para no bloquear)
-    try {
-      await Log.createLog(logData);
-    } catch (dbError) {
-      console.error('❌ Error guardando log en base de datos:', dbError.message);
-    }
+    // NOTA: Guardado en base de datos desactivado. Solo logs en consola.
+    // Para reactivar, descomenta las siguientes líneas:
+    // try {
+    //   await Log.createLog(logData);
+    // } catch (dbError) {
+    //   console.error("❌ Error guardando log en BD:", dbError.message);
+    // }
   }
 
   /**
@@ -102,9 +98,10 @@ class Logger {
   auditMiddleware() {
     return (req, res, next) => {
       // Solo registrar operaciones de modificación (POST, PUT, DELETE) y login
-      const shouldLog = ['POST', 'PUT', 'DELETE'].includes(req.method) ||
-        req.path.includes('/auth/login') ||
-        req.path.includes('/auth/verify-2fa-login');
+      const shouldLog =
+        ["POST", "PUT", "DELETE"].includes(req.method) ||
+        req.path.includes("/auth/login") ||
+        req.path.includes("/auth/verify-2fa-login");
 
       if (shouldLog) {
         return this.middleware()(req, res, next);
@@ -123,17 +120,21 @@ class Logger {
       // Datos del request
       const logData = {
         ip: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent') || '',
-        user: req.usuario?.usuario || req.body?.usuario || req.body?.username || 'desconocido'
+        userAgent: req.get("User-Agent") || "",
+        user:
+          req.usuario?.usuario ||
+          req.body?.usuario ||
+          req.body?.username ||
+          "desconocido",
       };
 
       // Log del acceso inicial (opcional, podrías solo loggear al final)
-      this.info('API', `ACCESO_${req.method}`, {
+      this.info("API", `ACCESO_${req.method}`, {
         ...logData,
         details: {
           path: req.originalUrl,
-          method: req.method
-        }
+          method: req.method,
+        },
       });
 
       // Interceptor de respuesta para loggear resultado final
@@ -141,14 +142,14 @@ class Logger {
       res.json = function (data) {
         const duration = Date.now() - startTime;
 
-        logger.info('API', `RESPUESTA_${req.method}`, {
+        logger.info("API", `RESPUESTA_${req.method}`, {
           ...logData,
           details: {
             path: req.originalUrl,
             statusCode: res.statusCode,
             duration: `${duration}ms`,
-            response: res.statusCode >= 400 ? data : undefined // Solo loggear error bodies
-          }
+            response: res.statusCode >= 400 ? data : undefined, // Solo loggear error bodies
+          },
         });
 
         return originalJson.call(this, data);
@@ -162,28 +163,28 @@ class Logger {
    * Método específico para logging de autenticación
    */
   logAuth(action, data = {}) {
-    this.info('AUTH', action, data);
+    this.info("AUTH", action, data);
   }
 
   /**
    * Método específico para logging de pacientes
    */
   logPaciente(action, data = {}) {
-    this.info('PACIENTE', action, data);
+    this.info("PACIENTE", action, data);
   }
 
   /**
    * Método específico para logging de valoraciones
    */
   logValoracion(action, data = {}) {
-    this.info('VALORACION', action, data);
+    this.info("VALORACION", action, data);
   }
 
   /**
    * Método específico para logging de RIPS
    */
   logRIPS(action, data = {}) {
-    this.info('RIPS', action, data);
+    this.info("RIPS", action, data);
   }
 }
 
