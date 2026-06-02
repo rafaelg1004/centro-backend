@@ -7,33 +7,8 @@ const router = express.Router();
 
 // FunciÃ³n para registrar logs de acceso a datos de pacientes
 function logAccesoPaciente(tipo, usuario, pacienteId, detalles = {}) {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    tipo,
-    usuario: usuario || "desconocido",
-    pacienteId,
-    ip: detalles.ip || "N/A",
-    userAgent: detalles.userAgent || "N/A",
-    ...detalles,
-  };
-
-  const logFile = path.join(__dirname, "../logs/acceso-pacientes.log");
-  const logDir = path.dirname(logFile);
-
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-
-  const logLine = JSON.stringify(logEntry) + "\n";
-
-  try {
-    fs.appendFileSync(logFile, logLine);
-    console.log(
-      `ðŸ“‹ LOG PACIENTE [${tipo}]: ${usuario || "desconocido"} - Paciente: ${pacienteId} - ${detalles.accion || "Sin acciÃ³n"}`,
-    );
-  } catch (error) {
-    console.error("â Œ Error escribiendo log de acceso a pacientes:", error);
-  }
+  // Log generation disabled per user request
+  return;
 }
 
 const logAccesoMiddleware = (accion) => {
