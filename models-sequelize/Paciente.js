@@ -70,9 +70,13 @@ module.exports = (sequelize, DataTypes) => {
       fecha_probable_parto: DataTypes.STRING(50),
       // Datos Pediátricos
       nombre_madre: DataTypes.STRING(100),
+      tipo_documento_madre: DataTypes.STRING(50),
+      num_documento_madre: DataTypes.STRING(50),
       edad_madre: DataTypes.STRING(50),
       ocupacion_madre: DataTypes.STRING(100),
       nombre_padre: DataTypes.STRING(100),
+      tipo_documento_padre: DataTypes.STRING(50),
+      num_documento_padre: DataTypes.STRING(50),
       edad_padre: DataTypes.STRING(50),
       ocupacion_padre: DataTypes.STRING(100),
       pediatra: DataTypes.STRING(100),
