@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { ConfiguracionClinica } = require("../models-sequelize");
-const { authenticateToken, requireRole } = require("../middlewares/auth");
+const { verificarToken } = require("./auth");
 
 /**
  * GET /api/configuracion
@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
  * PUT /api/configuracion
  * Actualiza la configuración de la clínica (Solo admin)
  */
-router.put("/", authenticateToken, requireRole("administracion"), async (req, res) => {
+router.put("/", verificarToken(["administracion"]), async (req, res) => {
   try {
     let config = await ConfiguracionClinica.findOne();
     
