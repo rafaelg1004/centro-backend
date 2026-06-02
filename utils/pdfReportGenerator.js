@@ -234,6 +234,15 @@ class PDFReportGenerator {
         doc.font('Helvetica').fontSize(9).fillColor(COLOR_TEXTO)
            .text(sanitizeText(motivoConsulta), { align: 'justify' });
 
+        const esValorValido = (v) => {
+          if (v === null || v === undefined || v === '') return false;
+          if (typeof v === 'string') {
+            const s = v.trim();
+            if (s === '-' || s === '.') return false;
+          }
+          return true;
+        };
+
         const formatLabel = (key) => {
           let str = key.replace(/_/g, ' ');
           str = str.replace(/([A-Z])/g, ' $1');
@@ -242,11 +251,11 @@ class PDFReportGenerator {
 
         const imprimirObjetoDinamico = async (obj) => {
           if (!obj) return;
-          const entries = Object.entries(obj).filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== 'id' && k !== 'valoracion_id');
+          const entries = Object.entries(obj).filter(([k, v]) => esValorValido(v) && k !== 'id' && k !== 'valoracion_id');
           
           for (const [key, value] of entries) {
             if (typeof value === 'object' && !Array.isArray(value)) {
-              if (Object.values(value).some(v => v !== null && v !== undefined && v !== '')) {
+              if (Object.values(value).some(v => esValorValido(v))) {
                 await tituloSeccion(formatLabel(key));
                 await imprimirObjetoDinamico(value);
               }
@@ -262,14 +271,20 @@ class PDFReportGenerator {
         };
 
         // --- CONTENIDO CLÍNICO DINÁMICO ---
-        const modulos = ['signosVitales', 'signos_vitales', 'moduloPediatria', 'modulo_pediatria', 'moduloPisoPelvico', 'modulo_piso_pelvico', 'moduloLactancia', 'modulo_lactancia', 'moduloPerinatal', 'modulo_perinatal'];
+        const modulosPorTipo = {
+          nino: ['moduloPediatria', 'modulo_pediatria'],
+          adulto: ['signosVitales', 'signos_vitales', 'moduloPisoPelvico', 'modulo_piso_pelvico'],
+          lactancia: ['moduloLactancia', 'modulo_lactancia'],
+          perinatal: ['signosVitales', 'signos_vitales', 'moduloPerinatal', 'modulo_perinatal']
+        };
+        const modulos = modulosPorTipo[type] || [];
         const modulosImpresos = new Set();
         
         for (const modName of modulos) {
           const baseName = modName.replace(/_/g, '').toLowerCase();
           if (modulosImpresos.has(baseName)) continue;
 
-          if (valuation[modName] && Object.values(valuation[modName]).some(v => v !== null && v !== undefined && v !== '')) {
+          if (valuation[modName] && Object.values(valuation[modName]).some(v => esValorValido(v))) {
             await tituloSeccion(formatLabel(modName));
             await imprimirObjetoDinamico(valuation[modName]);
             modulosImpresos.add(baseName);
@@ -344,17 +359,25 @@ class PDFReportGenerator {
 
         // --- PIE DE PÁGINA (Añadido al evento de finalizar todas las páginas) ---
         const range = doc.bufferedPageRange();
+        
+        // Desactivamos el salto de página automático temporalmente
+        const prevBottomMargin = doc.page.margins.bottom;
+        
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
+          doc.page.margins.bottom = 0; // Prevenir salto de página
+          
           doc.rect(0, doc.page.height - 40, doc.page.width, 40).fill('#F9FAFB');
           
           const fechaGen = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
           
           doc.fillColor(COLOR_TEXTO_CLARO).fontSize(7).font('Helvetica')
-             .text(`Generado el: ${fechaGen} | Sistema D'Mamitas | Página ${i + 1} de ${range.count}`, 50, doc.page.height - 25, { align: 'center' });
+             .text(`Generado el: ${fechaGen} | Sistema D'Mamitas | Página ${i + 1} de ${range.count}`, 50, doc.page.height - 25, { align: 'center', lineBreak: false });
              
           doc.fontSize(6).fillColor(COLOR_TEXTO_CLARO)
-             .text('Validez legal conforme a la Ley 527 de 1999 de la República de Colombia. Documento Confidencial.', 50, doc.page.height - 15, { align: 'center' });
+             .text('Validez legal conforme a la Ley 527 de 1999 de la República de Colombia. Documento Confidencial.', 50, doc.page.height - 15, { align: 'center', lineBreak: false });
+             
+          doc.page.margins.bottom = prevBottomMargin;
         }
 
         doc.end();
