@@ -15,7 +15,7 @@ function formatClase(claseModel) {
   if (clase.ninos) {
     clase.ninos = clase.ninos.map(n => ({
       ...n,
-      numero_factura: n.numero_factura,
+      numeroFactura: n.numero_factura,
       nino: n.paciente // Mapear paciente a nino para compatibilidad frontend
     }));
   }
@@ -415,7 +415,7 @@ router.get("/paciente/:id", async (req, res) => {
         if (clase.ninos) {
           clase.ninos = clase.ninos.map((n) => ({
             ...n,
-            numero_factura: n.numero_factura,
+            numeroFactura: n.numero_factura,
             nino: n.paciente, // Agregar alias nino para compatibilidad con frontend
           }));
         }
