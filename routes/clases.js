@@ -370,7 +370,8 @@ router.get("/paciente/:id", async (req, res) => {
           include: [
             {
               model: ClaseNino,
-              as: "clase_ninos", // Usar clase_ninos en lugar de ninos
+              as: "ninos",
+
               include: [
                 {
                   model: Paciente,
@@ -395,14 +396,13 @@ router.get("/paciente/:id", async (req, res) => {
           return null;
         }
 
-        // Transformar clase_ninos para que tengan nino en lugar de paciente
-        if (clase.clase_ninos) {
-          clase.ninos = clase.clase_ninos.map((n) => ({
+        // Transformar ninos para que tengan nino en lugar de paciente
+        if (clase.ninos) {
+          clase.ninos = clase.ninos.map((n) => ({
             ...n,
             numero_factura: n.numero_factura,
             nino: n.paciente, // Agregar alias nino para compatibilidad con frontend
           }));
-          delete clase.clase_ninos; // Eliminar el campo original
         }
 
         console.log(

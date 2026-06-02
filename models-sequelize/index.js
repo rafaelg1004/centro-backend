@@ -81,7 +81,7 @@ Clase.belongsToMany(Paciente, {
   through: ClaseNino,
   foreignKey: "clase_id",
   otherKey: "paciente_id",
-  as: "ninos",
+  as: "pacientes",
 });
 Paciente.belongsToMany(Clase, {
   through: ClaseNino,
@@ -93,7 +93,7 @@ Paciente.belongsToMany(Clase, {
 // Relaciones directas para includes
 Clase.hasMany(ClaseNino, {
   foreignKey: "clase_id",
-  as: "clase_ninos",
+  as: "ninos",
 });
 ClaseNino.belongsTo(Clase, {
   foreignKey: "clase_id",
