@@ -51,7 +51,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       cod_diagnostico_principal: {
-        type: DataTypes.STRING(20),
+        type: DataTypes.STRING(50),
         allowNull: true,
       },
       tipo_diagnostico_principal: {

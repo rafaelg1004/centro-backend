@@ -8,6 +8,21 @@ const {
 } = require("../models-sequelize");
 const { Op } = require("sequelize");
 
+// Función auxiliar para mapear el formato esperado por el frontend
+function formatClase(claseModel) {
+  if (!claseModel) return null;
+  const clase = typeof claseModel.toJSON === 'function' ? claseModel.toJSON() : claseModel;
+  if (clase.ninos) {
+    clase.ninos = clase.ninos.map(n => ({
+      ...n,
+      numero_factura: n.numero_factura,
+      nino: n.paciente // Mapear paciente a nino para compatibilidad frontend
+    }));
+  }
+  return clase;
+}
+
+
 // Crear clase
 router.post("/", async (req, res) => {
   try {
@@ -79,7 +94,7 @@ router.post("/:id/agregar-nino", async (req, res) => {
         },
       ],
     });
-    res.json(claseActualizada);
+    res.json(formatClase(claseActualizada));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -138,7 +153,7 @@ router.post("/:id/asignar-paquete", async (req, res) => {
         },
       ],
     });
-    res.json(claseActualizada);
+    res.json(formatClase(claseActualizada));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -179,7 +194,7 @@ router.post("/:id/firma-nino", async (req, res) => {
         },
       ],
     });
-    res.json(claseActualizada);
+    res.json(formatClase(claseActualizada));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -248,7 +263,7 @@ router.get("/:id", async (req, res) => {
       ],
     });
     if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
-    res.json(clase);
+    res.json(formatClase(clase));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -267,7 +282,7 @@ router.post("/:id/firma", async (req, res) => {
       firma: req.body.firma,
       audit_trail: obtenerMetadatosPista(req),
     });
-    res.json(clase.toJSON());
+    res.json(formatClase(clase));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -314,7 +329,7 @@ router.post("/:id/eliminar-nino", async (req, res) => {
         },
       ],
     });
-    res.json(claseActualizada);
+    res.json(formatClase(claseActualizada));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -446,7 +461,7 @@ router.put("/:id", async (req, res) => {
     }
 
     await claseActual.update(updateData);
-    res.json(claseActual.toJSON());
+    res.json(formatClase(claseActual));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
