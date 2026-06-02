@@ -93,6 +93,35 @@ class PDFReportGenerator {
           doc.y = currentY + 10;
         };
 
+        const dibujarTablaUnaColumna = async (titulo, texto) => {
+          const tableWidth = doc.page.width - 100;
+          doc.font('Helvetica').fontSize(8);
+          const textHeight = doc.heightOfString(String(texto), { width: tableWidth - 10, align: 'justify' });
+          const totalHeight = 16 + textHeight + 12; // header + padding + text + margin
+          await checkSpace(totalHeight);
+          
+          const startY = doc.y;
+          // Header
+          doc.rect(50, startY, tableWidth, 16).fill('#F3F4F6');
+          doc.fillColor('#1F2937').fontSize(9).font('Helvetica-Bold').text(titulo.toUpperCase(), 55, startY + 4);
+          
+          let currentY = startY + 16;
+          doc.lineWidth(0.5).strokeColor('#D1D5DB');
+          doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          
+          // Borders
+          doc.moveTo(50, currentY).lineTo(50, currentY + textHeight + 8).stroke();
+          doc.moveTo(50 + tableWidth, currentY).lineTo(50 + tableWidth, currentY + textHeight + 8).stroke();
+          
+          doc.font('Helvetica').fontSize(8).fillColor('#4B5563')
+             .text(String(texto), 55, currentY + 4, { width: tableWidth - 10, align: 'justify' });
+          
+          currentY += textHeight + 8;
+          doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          
+          doc.y = currentY + 10;
+        };
+
         const addPageHeader = async (doc, isFirstPage = false) => {
           if (!isFirstPage) {
             doc.y = 50;
@@ -150,26 +179,6 @@ class PDFReportGenerator {
         // --- INICIO DEL DOCUMENTO ---
         await addPageHeader(doc, true);
 
-        // --- DATOS DEL PRESTADOR ---
-        const nitPrestador = config.nit || "901XXXXXX-X";
-        const profPrestador = getVal(profesional, 'nombre', 'nombre');
-        const nombrePrestador = profPrestador || config.nombre_clinica || "D'Mamitas & Babies";
-        const telPrestador = config.telefono || "+57 317 2774885";
-        const codHabPrestador = config.codigo_habilitacion || "1500100XXXX-X";
-        const dirPrestador = config.direccion || "Cra 1 W 28-47, Tunja";
-        const emailPrestador = config.email || "contacto@dmamitas.com";
-        
-        const datosPrestador = [
-          ['NIT', nitPrestador],
-          ['Información del Prestador', nombrePrestador],
-          ['Teléfono', telPrestador],
-          ['Código Hab.', codHabPrestador],
-          ['Dirección de la Sede', dirPrestador],
-          ['Email', emailPrestador]
-        ];
-        
-        await dibujarTablaDosColumnas("DATOS DEL PRESTADOR", datosPrestador);
-
         // --- TITULO DEL REPORTE ---
         const subTitulos = {
           nino:      "VALORACIÓN DE INGRESO PEDIÁTRICA",
@@ -198,9 +207,61 @@ class PDFReportGenerator {
         const fechaAtencion = fmtFechaCompleta(fechaAtencionRaw) || fmtFechaCompleta(new Date());
         const codCups = getVal(valuation, 'codConsulta', 'cod_consulta');
         
-        doc.fillColor(COLOR_TEXTO_CLARO).fontSize(8).font('Helvetica')
-           .text(`FECHA DE ATENCIÓN: ${fechaAtencion}   |   CÓDIGO CUPS: ${codCups || 'N/A'}`, { align: 'center' });
-        doc.moveDown(1);
+        let cupsDesc = '';
+        if (codCups) {
+          const CUPS_FALLBACK = {
+            '890201': 'CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA',
+            '890211': 'CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA',
+            '890264': 'CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA',
+            '890384': 'CONSULTA DE CONTROL O DE SEGUIMIENTO POR FISIOTERAPIA',
+            '890202': 'VALORACIÓN DE PISO PÉLVICO - PRIMERA VEZ',
+            '890203': 'VALORACIÓN DE LACTANCIA - PRIMERA VEZ',
+            '890204': 'VALORACIÓN PROGRAMA PERINATAL',
+          };
+          cupsDesc = CUPS_FALLBACK[codCups] || '';
+          if (!cupsDesc) {
+            try {
+              const { CodigoCUPS, CupsCatalogo } = require('../models-sequelize');
+              const cupsInfo = await CodigoCUPS.findOne({ where: { codigo: codCups } });
+              if (cupsInfo && cupsInfo.nombre) {
+                cupsDesc = cupsInfo.nombre;
+              } else {
+                const cupsCat = await CupsCatalogo.findOne({ where: { codigo_cups: codCups } });
+                if (cupsCat && cupsCat.descripcion) {
+                  cupsDesc = cupsCat.descripcion;
+                }
+              }
+            } catch (e) {
+              console.error("Error fetching CUPS description:", e.message);
+            }
+          }
+        }
+        
+        const cupsLabel = cupsDesc ? `${codCups} - ${cupsDesc}` : (codCups || 'N/A');
+
+        doc.fillColor(COLOR_TEXTO_CLARO).fontSize(8.5).font('Helvetica')
+           .text(`FECHA DE ATENCIÓN: ${fechaAtencion}   |   CÓDIGO CUPS: ${cupsLabel}`, { align: 'center' });
+        doc.moveDown(1.5);
+
+        // --- DATOS DEL PRESTADOR ---
+        const nitPrestador = config.nit || "901XXXXXX-X";
+        const profPrestador = getVal(profesional, 'nombre', 'nombre');
+        const nombrePrestador = profPrestador || config.nombre_clinica || "D'Mamitas & Babies";
+        const telPrestador = config.telefono || "+57 317 2774885";
+        const codHabPrestador = config.codigo_habilitacion || "1500100XXXX-X";
+        const dirPrestador = config.direccion || "Cra 1 W 28-47, Tunja";
+        const emailPrestador = config.email || "contacto@dmamitas.com";
+        
+        const datosPrestador = [
+          ['NIT', nitPrestador],
+          ['Información del Prestador', nombrePrestador],
+          ['Teléfono', telPrestador],
+          ['Código Hab.', codHabPrestador],
+          ['Dirección de la Sede', dirPrestador],
+          ['Email', emailPrestador]
+        ];
+        
+        await dibujarTablaDosColumnas("DATOS DEL PRESTADOR", datosPrestador);
 
         // --- DATOS DEL PACIENTE ---
         const nombres = getVal(paciente, 'nombres', 'nombres') || '';
@@ -249,9 +310,9 @@ class PDFReportGenerator {
 
         // --- MOTIVO DE CONSULTA ---
         const motivoConsulta = getVal(valuation, 'motivoConsulta', 'motivo_consulta');
-        await tituloSeccion("Motivo de Consulta");
-        doc.font('Helvetica').fontSize(9).fillColor(COLOR_TEXTO)
-           .text(sanitizeText(motivoConsulta), { align: 'justify' });
+        if (motivoConsulta) {
+          await dibujarTablaUnaColumna("Motivo de Consulta", sanitizeText(motivoConsulta));
+        }
 
         const esValorValido = (v) => {
           if (v === null || v === undefined || v === '') return false;
@@ -268,7 +329,7 @@ class PDFReportGenerator {
           return str.charAt(0).toUpperCase() + str.slice(1).trim().toLowerCase();
         };
 
-        const imprimirObjetoDinamico = async (obj) => {
+        const imprimirObjetoDinamico = async (obj, sectionTitle = '') => {
           if (!obj) return;
           const entries = Object.entries(obj).filter(([k, v]) => esValorValido(v) && k !== 'id' && k !== 'valoracion_id');
           
@@ -313,31 +374,16 @@ class PDFReportGenerator {
             }
           }
 
-          let primY = doc.y;
-          let leftY = doc.y;
-          for (let i = 0; i < primitives.length; i++) {
-             if (i % 2 === 0) {
-                await checkSpace(25);
-                primY = doc.y;
-                await campo(primitives[i][0], primitives[i][1], 1, primY);
-                leftY = doc.y;
-             } else {
-                await campo(primitives[i][0], primitives[i][1], 2, primY);
-                let rightY = doc.y;
-                doc.y = Math.max(leftY, rightY) + 5;
-             }
-          }
-          if (primitives.length > 0 && primitives.length % 2 !== 0) {
-             doc.y = leftY + 5;
+          if (primitives.length > 0) {
+            await dibujarTablaDosColumnas(sectionTitle || "Detalles", primitives);
           }
 
           for (const b of blocks) {
-             await bloque(b[0], b[1]);
+            await dibujarTablaUnaColumna(b[0], b[1]);
           }
 
           for (const o of objects) {
-             await tituloSeccion(formatLabel(o[0]));
-             await imprimirObjetoDinamico(o[1]);
+            await imprimirObjetoDinamico(o[1], formatLabel(o[0]));
           }
         };
 
@@ -356,19 +402,21 @@ class PDFReportGenerator {
           if (modulosImpresos.has(baseName)) continue;
 
           if (valuation[modName] && Object.values(valuation[modName]).some(v => esValorValido(v))) {
-            await tituloSeccion(formatLabel(modName));
-            await imprimirObjetoDinamico(valuation[modName]);
+            await imprimirObjetoDinamico(valuation[modName], formatLabel(modName));
             modulosImpresos.add(baseName);
           }
         }
 
         // --- DIAGNOSTICO Y TRATAMIENTO (Común a todos) ---
-        await tituloSeccion("Diagnóstico y Plan de Tratamiento");
         const diagnostico = getVal(valuation, 'diagnosticoFisioterapeutico', 'diagnostico_fisioterapeutico');
-        await bloque("Diagnóstico Fisioterapéutico", diagnostico);
+        if (diagnostico) {
+          await dibujarTablaUnaColumna("Diagnóstico Fisioterapéutico", diagnostico);
+        }
         
         const plan = getVal(valuation, 'planTratamiento', 'plan_tratamiento');
-        await bloque("Plan de Intervención / Tratamiento", plan);
+        if (plan) {
+          await dibujarTablaUnaColumna("Plan de Intervención / Tratamiento", plan);
+        }
 
         // --- FIRMAS ---
         await checkSpace(150);
