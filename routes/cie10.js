@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const { CIE10 } = require('../models-sequelize/index');
+const { Op } = require('sequelize');
 
 // GET /api/cie10?q=texto&limit=15
 // Busca por código o nombre en la tabla CIE-10
@@ -13,19 +14,18 @@ router.get('/', async (req, res) => {
             return res.json([]);
         }
 
-        const db = mongoose.connection.db;
         const query = q.trim();
 
-        // Buscar por coincidencia de código (exacto o prefijo) O por texto en nombre
-        const results = await db.collection('cie10s').find({
-            $or: [
-                { codigo: { $regex: `^${query}`, $options: 'i' } },
-                { descripcion: { $regex: query, $options: 'i' } }
-            ]
-        })
-            .sort({ codigo: 1 })
-            .limit(lim)
-            .toArray();
+        const results = await CIE10.findAll({
+            where: {
+                [Op.or]: [
+                    { codigo: { [Op.iLike]: `${query}%` } },
+                    { descripcion: { [Op.iLike]: `%${query}%` } }
+                ]
+            },
+            order: [['codigo', 'ASC']],
+            limit: lim
+        });
 
         res.json(results.map(r => ({
             codigo: r.codigo,

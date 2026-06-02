@@ -789,42 +789,4 @@ router.put(
     }
   },
 );
-
-router.get("/legacy/:collection/:id", async (req, res) => {
-  try {
-    const { collection, id } = req.params;
-    const db = mongoose.connection.db;
-
-    // Lista blanca de colecciones permitidas
-    const allowed = [
-      "valoracioningresos",
-      "valoracioningresoadultoslactancias",
-      "valoracionpisopelvicos",
-    ];
-    if (!allowed.includes(collection)) {
-      return res.status(403).json({ error: "ColecciÃ³n no permitida" });
-    }
-
-    const doc = await db
-      .collection(collection)
-      .findOne({ _id: new mongoose.Types.ObjectId(id) });
-    if (!doc) return res.status(404).json({ error: "No encontrada" });
-
-    // Intentar obtener el paciente para el nombre
-    let paciente = null;
-    if (doc.paciente) {
-      paciente = await db
-        .collection("pacientes")
-        .findOne({ _id: new mongoose.Types.ObjectId(doc.paciente) });
-    }
-
-    res.json({ ...doc, _legacy: true, _collection: collection, paciente });
-  } catch (error) {
-    res.status(500).json({
-      mensaje: "Error al obtener valoraciÃ³n legacy",
-      error: error.message,
-    });
-  }
-});
-
 module.exports = router;

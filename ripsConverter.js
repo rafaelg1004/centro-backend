@@ -3,7 +3,7 @@
  * Ministerio de Salud y Protección Social - Colombia
  */
 
-const mongoose = require('mongoose');
+// Eliminado mongoose
 const ripsConfig = require('./ripsConfig');
 
 // Cache de códigos CUPS cargados de la BD
@@ -43,8 +43,8 @@ class RIPSConverter {
       }
 
       // Intentar cargar desde BD
-      const CodigoCUPS = require('./models/CodigoCUPS');
-      const codigos = await CodigoCUPS.find({ activo: true });
+      const { CodigoCUPS } = require('./models-sequelize/index');
+      const codigos = await CodigoCUPS.findAll({ where: { activo: true } });
 
       if (codigos && codigos.length > 0) {
         // Convertir a un mapa por claveInterna para acceso rápido

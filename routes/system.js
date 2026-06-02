@@ -1,12 +1,18 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { sequelize } = require('../models-sequelize/index');
 const router = express.Router();
 
 // Health check endpoint para monitoreo
 router.get('/health', async (req, res) => {
     try {
         // Verificar conexión a base de datos
-        const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+        let dbStatus = 'connected';
+        try {
+            await sequelize.authenticate();
+        } catch (error) {
+            dbStatus = 'disconnected';
+            console.error('Error connecting to PostgreSQL:', error);
+        }
 
         // Información básica del sistema
         const healthCheck = {
@@ -16,7 +22,7 @@ router.get('/health', async (req, res) => {
             memory: process.memoryUsage(),
             database: {
                 status: dbStatus,
-                name: mongoose.connection.name
+                name: sequelize.config.database
             },
             environment: process.env.NODE_ENV || 'development',
             version: '1.0.0'
