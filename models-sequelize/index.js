@@ -144,6 +144,12 @@ EvolucionSesion.belongsTo(ValoracionFisioterapia, {
   as: "valoracion",
 });
 
+// Valoracion -> Usuario (N:1)
+ValoracionFisioterapia.belongsTo(Usuario, {
+  foreignKey: "creado_por",
+  as: "creador"
+});
+
 // Log -> Paciente (N:1 opcional)
 Log.belongsTo(Paciente, {
   foreignKey: "paciente_id",

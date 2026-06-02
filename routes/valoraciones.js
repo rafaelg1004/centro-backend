@@ -320,6 +320,11 @@ router.get(
               "num_documento_identificacion",
             ],
           },
+          {
+            model: require("../models-sequelize").Usuario,
+            as: "creador",
+            attributes: ["nombre"]
+          }
         ],
         order: [["created_at", "DESC"]],
         offset: skip,

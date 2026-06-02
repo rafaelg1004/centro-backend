@@ -45,4 +45,36 @@ router.get('/health', async (req, res) => {
     }
 });
 
+// Endpoint temporal para arreglar valoraciones sin creador
+router.get('/fix-creador', async (req, res) => {
+    try {
+        const { Usuario, ValoracionFisioterapia } = require('../models-sequelize/index');
+        const { Op } = require('sequelize');
+        
+        // Buscar a la doctora (Dayan Ivonne Villegas)
+        const doctora = await Usuario.findOne({ 
+            where: { nombre: { [Op.iLike]: '%Dayan%' } } 
+        });
+
+        if (!doctora) {
+            return res.status(404).json({ message: "No se encontró el usuario de la Doctora Dayan." });
+        }
+
+        // Actualizar valoraciones donde creado_por sea null
+        const [updatedRows] = await ValoracionFisioterapia.update(
+            { creado_por: doctora.id },
+            { where: { creado_por: null } }
+        );
+
+        res.json({
+            status: 'ok',
+            message: `Se asignaron ${updatedRows} valoraciones a la doctora ${doctora.nombre}`
+        });
+
+    } catch (error) {
+        console.error('Error fixing creador:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

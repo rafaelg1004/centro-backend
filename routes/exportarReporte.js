@@ -26,7 +26,7 @@ router.get("/exportar-pdf/:id", async (req, res) => {
 
     // Cargar paciente y creador manualmente
     const pacienteData = await Paciente.findByPk(valoracion.paciente_id);
-    const creadorData = await Usuario.findByPk(valoracion.creado_por_id, {
+    const creadorData = await Usuario.findByPk(valoracion.creado_por || valoracion.usuario_id, {
       attributes: ["nombre", "registro_medico", "firma_url"],
     });
 
