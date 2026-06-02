@@ -86,6 +86,18 @@ router.post("/", async (req, res) => {
       };
     }
 
+    // Mapear explícitamente los campos nuevos a snake_case
+    data.tipo_documento_madre = req.body.tipoDocumentoMadre;
+    data.num_documento_madre = req.body.numDocumentoMadre;
+    data.tipo_documento_padre = req.body.tipoDocumentoPadre;
+    data.num_documento_padre = req.body.numDocumentoPadre;
+    data.nombre_madre = req.body.nombreMadre;
+    data.edad_madre = req.body.edadMadre;
+    data.ocupacion_madre = req.body.ocupacionMadre;
+    data.nombre_padre = req.body.nombrePadre;
+    data.edad_padre = req.body.edadPadre;
+    data.ocupacion_padre = req.body.ocupacionPadre;
+
     const paciente = await Paciente.create(data);
     res.json({ mensaje: "Paciente registrado correctamente", id: paciente.id });
   } catch (error) {
