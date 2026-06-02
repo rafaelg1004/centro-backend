@@ -192,8 +192,10 @@ async function migrarValoraciones() {
     const pacienteId = idMap.pacientes.get(pacienteIdRaw);
     if (!pacienteId) continue;
 
+    const fechaAtencion = v.fechaInicioAtencion || v.createdAt || new Date(0);
+
     let existing = await models.ValoracionFisioterapia.findOne({
-      where: { paciente_id: pacienteId, fecha_inicio_atencion: v.fechaInicioAtencion || new Date(0) }
+      where: { paciente_id: pacienteId, fecha_inicio_atencion: fechaAtencion }
     });
     // Fallback: si no la encuentra por fecha exacta, podemos buscar la primera o simplemente crearla
     let newId = existing ? existing.id : generateUUID();
@@ -211,7 +213,7 @@ async function migrarValoraciones() {
           paciente_id: pacienteId,
           creado_por: creadoPorUUID,
           tipo_programa: v.tipoPrograma,
-          fecha_inicio_atencion: v.fechaInicioAtencion || new Date(),
+          fecha_inicio_atencion: fechaAtencion,
           num_autorizacion: v.numAutorizacion,
           cod_consulta: v.codConsulta || "890201",
           modalidad_grupo_servicio_tec_sal: v.modalidadGrupoServicioTecSal || "09",
@@ -248,12 +250,14 @@ async function migrarEvoluciones() {
     const valoracionId = idMap.valoraciones.get(e.valoracionAsociada?.toString());
     if (!pacienteId || !valoracionId) continue;
 
+    const fechaAtencion = e.fechaInicioAtencion || e.createdAt || new Date(0);
+
     let existing = await models.EvolucionSesion.findOne({
       where: { valoracion_id: valoracionId, numero_sesion: e.numeroSesion || null }
     });
     if(!existing) {
        existing = await models.EvolucionSesion.findOne({
-         where: { valoracion_id: valoracionId, fecha_inicio_atencion: e.fechaInicioAtencion || new Date(0) }
+         where: { valoracion_id: valoracionId, fecha_inicio_atencion: fechaAtencion }
        });
     }
 
@@ -264,7 +268,7 @@ async function migrarEvoluciones() {
       try {
         await models.EvolucionSesion.create({
           id: newId, valoracion_id: valoracionId, paciente_id: pacienteId,
-          fecha_inicio_atencion: e.fechaInicioAtencion || new Date(),
+          fecha_inicio_atencion: fechaAtencion,
           cod_procedimiento: e.codProcedimiento,
           via_ingreso_servicio_salud: e.viaIngresoServicioSalud || "02",
           cod_diagnostico_principal: e.codDiagnosticoPrincipal,

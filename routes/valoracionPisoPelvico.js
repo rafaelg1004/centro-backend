@@ -66,9 +66,7 @@ router.post("/", bloquearBase64, async (req, res) => {
     // Mapear campos del formulario legacy al nuevo modelo unificado
     const nuevaValoracion = await ValoracionFisioterapia.create({
       paciente_id: req.body.paciente,
-      fecha_inicio_atencion: req.body.fecha
-        ? new Date(req.body.fecha)
-        : new Date(),
+      fecha_inicio_atencion: new Date(),
       cod_consulta: CUPS_PISO_PELVICO,
       finalidad_tecnologia_salud: "44",
       causa_motivo_atencion: "21",

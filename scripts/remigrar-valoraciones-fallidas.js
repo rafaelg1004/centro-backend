@@ -114,11 +114,13 @@ async function main() {
         continue;
       }
 
+      const fechaAtencion = v.fechaInicioAtencion || v.createdAt || new Date(0);
+
       // Verificar si ya existe en PostgreSQL (por paciente y fecha)
       const existente = await models.ValoracionFisioterapia.findOne({
         where: {
           paciente_id: pacienteUUID,
-          fecha_inicio_atencion: v.fechaInicioAtencion || new Date(),
+          fecha_inicio_atencion: fechaAtencion,
         },
       });
 
@@ -154,7 +156,7 @@ async function main() {
         paciente_id: pacienteUUID,
         creado_por: creadoPorLimpio,
         tipo_programa: v.tipoPrograma,
-        fecha_inicio_atencion: v.fechaInicioAtencion || new Date(),
+        fecha_inicio_atencion: fechaAtencion,
         num_autorizacion: v.numAutorizacion,
         cod_consulta: (v.codConsulta || "890201").toString().substring(0, 50),
         modalidad_grupo_servicio_tec_sal:

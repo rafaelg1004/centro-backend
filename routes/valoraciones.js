@@ -223,6 +223,8 @@ router.post("/", validarImagenes, async (req, res) => {
 
     const valoracionGuardada = await ValoracionFisioterapia.create({
       ...req.body,
+      fecha_inicio_atencion: new Date(),
+      fechaInicioAtencion: new Date(),
       creado_por: req.usuario?.id || null,
     });
 

@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
     const guardada = await EvolucionSesion.create({
       valoracion_asociada_id: vId,
       paciente_id: paciente,
-      fecha_inicio_atencion: fecha ? new Date(fecha) : new Date(),
+      fecha_inicio_atencion: new Date(),
       cod_procedimiento: CUPS_PERINATAL,
       finalidad_tecnologia_salud: "44",
       cod_diagnostico_principal: "Z348",
