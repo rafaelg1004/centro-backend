@@ -18,10 +18,10 @@ router.post("/", async (req, res) => {
 });
 
 // Obtener todos los paquetes de un niño
-router.get("/por-nino/:ninoId", async (req, res) => {
+router.get("/por-nino/:paciente_id", async (req, res) => {
   try {
     const paquetes = await PagoPaquete.findAll({
-      where: { paciente_id: req.params.ninoId },
+      where: { paciente_id: req.params.paciente_id },
     });
     res.json(paquetes);
   } catch (e) {
@@ -30,12 +30,12 @@ router.get("/por-nino/:ninoId", async (req, res) => {
 });
 
 // Buscar paquetes por número de factura para un niño específico
-router.get("/buscar-por-nino/:ninoId", async (req, res) => {
+router.get("/buscar-por-nino/:paciente_id", async (req, res) => {
   try {
-    const { ninoId } = req.params;
+    const { paciente_id } = req.params;
     const { query } = req.query;
 
-    let whereClause = { paciente_id: ninoId };
+    let whereClause = { paciente_id };
 
     if (query && query.trim()) {
       whereClause.numero_factura = { [Op.iLike]: `%${query.trim()}%` };
@@ -121,9 +121,9 @@ router.get("/reporte", async (req, res) => {
 
 router.post("/usar-clase", async (req, res) => {
   try {
-    const { ninoId, numeroFactura } = req.body;
+    const { paciente_id, numero_factura } = req.body;
     const paquete = await PagoPaquete.findOne({
-      where: { paciente_id: ninoId, numero_factura: numeroFactura },
+      where: { paciente_id, numero_factura },
     });
 
     if (!paquete) {
@@ -163,16 +163,16 @@ router.get("/:id", async (req, res) => {
 // Actualizar un paquete por ID
 router.put("/:id", async (req, res) => {
   try {
-    const { numeroFactura, clasesPagadas, fechaPago } = req.body;
+    const { numero_factura, clases_pagadas, fecha_pago } = req.body;
 
     // Validaciones
-    if (!numeroFactura || !numeroFactura.trim()) {
+    if (!numero_factura || !numero_factura.trim()) {
       return res
         .status(400)
         .json({ error: "El número de factura es obligatorio" });
     }
 
-    if (!clasesPagadas || clasesPagadas <= 0) {
+    if (!clases_pagadas || clases_pagadas <= 0) {
       return res
         .status(400)
         .json({ error: "El número de clases pagadas debe ser mayor a 0" });
@@ -184,17 +184,17 @@ router.put("/:id", async (req, res) => {
     }
 
     // Verificar que las clases pagadas no sean menores a las ya usadas
-    if (clasesPagadas < paquete.clases_usadas) {
+    if (clases_pagadas < paquete.clases_usadas) {
       return res.status(400).json({
-        error: `No puedes establecer menos clases pagadas (${clasesPagadas}) que las ya usadas (${paquete.clases_usadas})`,
+        error: `No puedes establecer menos clases pagadas (${clases_pagadas}) que las ya usadas (${paquete.clases_usadas})`,
       });
     }
 
     // Verificar que el número de factura sea único (si es diferente al actual)
-    if (numeroFactura !== paquete.numero_factura) {
+    if (numero_factura !== paquete.numero_factura) {
       const facturaExistente = await PagoPaquete.findOne({
         where: {
-          numero_factura: numeroFactura.trim(),
+          numero_factura: numero_factura.trim(),
           id: { [Op.ne]: req.params.id },
         },
       });
@@ -208,9 +208,9 @@ router.put("/:id", async (req, res) => {
 
     // Actualizar el paquete
     await paquete.update({
-      numero_factura: numeroFactura.trim(),
-      clases_pagadas: parseInt(clasesPagadas),
-      fecha_pago: fechaPago,
+      numero_factura: numero_factura.trim(),
+      clases_pagadas: parseInt(clases_pagadas),
+      fecha_pago,
     });
 
     // Obtener el paquete actualizado con paciente
