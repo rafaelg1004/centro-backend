@@ -5,7 +5,11 @@ class PDFReportGenerator {
   async generateValuationPDF(valuation, paciente, type = 'nino', profesional = {}, config = {}) {
     return new Promise(async (resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+        const doc = new PDFDocument({ 
+          margins: { top: 50, bottom: 30, left: 50, right: 50 }, 
+          size: 'A4', 
+          bufferPages: true 
+        });
         const buffers = [];
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => resolve(Buffer.concat(buffers)));
