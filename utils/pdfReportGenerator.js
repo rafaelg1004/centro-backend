@@ -158,8 +158,23 @@ class PDFReportGenerator {
         doc.fillColor(COLOR_TEXTO).fontSize(13).font('Helvetica-Bold')
            .text(subTitulos[type] || "HISTORIA CLÍNICA", { align: 'center' });
         
+        const fmtFechaCompleta = (d) => {
+          if (!d) return null;
+          try {
+            const date = new Date(d);
+            // Formato YYYY-MM-DD HH:mm:ss
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            const ss = String(date.getSeconds()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+          } catch { return String(d); }
+        };
+
         const fechaAtencionRaw = getVal(valuation, 'fechaInicioAtencion', 'fecha_inicio_atencion') || getVal(valuation, 'createdAt', 'created_at');
-        const fechaAtencion = fmtFecha(fechaAtencionRaw) || fmtFecha(new Date());
+        const fechaAtencion = fmtFechaCompleta(fechaAtencionRaw) || fmtFechaCompleta(new Date());
         const codCups = getVal(valuation, 'codConsulta', 'cod_consulta');
         
         doc.fillColor(COLOR_TEXTO_CLARO).fontSize(8).font('Helvetica')
@@ -201,26 +216,14 @@ class PDFReportGenerator {
           ['Entidad Aseguradora', aseguradora || 'Particular'],
         ];
 
-        const esAdulto = getVal(paciente, 'esAdulto', 'es_adulto');
+        const estadoCivil = getVal(paciente, 'estadoCivil', 'estado_civil');
+        if (estadoCivil) datosPac.push(['Estado Civil', estadoCivil]);
+
+        const ocupacion = getVal(paciente, 'ocupacion', 'ocupacion');
+        if (ocupacion) datosPac.push(['Ocupación Actual', ocupacion]);
         
-        if (!esAdulto) {
-          const nombreMadre = getVal(paciente, 'nombreMadre', 'nombre_madre');
-          const ocupMadre = getVal(paciente, 'ocupacionMadre', 'ocupacion_madre');
-          if (nombreMadre) datosPac.push(['Madre', `${nombreMadre}${ocupMadre ? ` (${ocupMadre})` : ''}`]);
-          
-          const nombrePadre = getVal(paciente, 'nombrePadre', 'nombre_padre');
-          const ocupPadre = getVal(paciente, 'ocupacionPadre', 'ocupacion_padre');
-          if (nombrePadre) datosPac.push(['Padre', `${nombrePadre}${ocupPadre ? ` (${ocupPadre})` : ''}`]);
-          
-          const pediatra = getVal(paciente, 'pediatra', 'pediatra');
-          if (pediatra) datosPac.push(['Médico Pediatra', pediatra]);
-        } else {
-          const ocupacion = getVal(paciente, 'ocupacion', 'ocupacion');
-          if (ocupacion) datosPac.push(['Ocupación Actual', ocupacion]);
-          
-          const semanasGestacion = getVal(paciente, 'semanasGestacion', 'semanas_gestacion');
-          if (semanasGestacion) datosPac.push(['Semanas Gestación', semanasGestacion]);
-        }
+        const regimen = getVal(paciente, 'regimen', 'regimen');
+        if (regimen) datosPac.push(['Régimen', regimen]);
 
         const startY = doc.y;
         datosPac.forEach((r, i) => {
@@ -253,20 +256,72 @@ class PDFReportGenerator {
           if (!obj) return;
           const entries = Object.entries(obj).filter(([k, v]) => esValorValido(v) && k !== 'id' && k !== 'valoracion_id');
           
+          const primitives = [];
+          const blocks = [];
+          const objects = [];
+
           for (const [key, value] of entries) {
+            let isFlattenable = false;
+            let flattenedValue = '';
+            
             if (typeof value === 'object' && !Array.isArray(value)) {
-              if (Object.values(value).some(v => esValorValido(v))) {
-                await tituloSeccion(formatLabel(key));
-                await imprimirObjetoDinamico(value);
-              }
-            } else {
-              const strVal = String(value);
-              if (strVal.length > 80 || strVal.includes('\n')) {
-                await bloque(formatLabel(key), strVal);
-              } else {
-                await campo(formatLabel(key), strVal);
+              const keys = Object.keys(value);
+              const hasSi = keys.includes('si') || keys.includes('SI');
+              const hasTiempo = keys.includes('tiempo');
+              const hasObs = keys.includes('obs') || keys.includes('observaciones');
+              
+              if (hasSi || hasTiempo || hasObs) {
+                 isFlattenable = true;
+                 const siVal = value.si || value.SI;
+                 if (esValorValido(siVal)) flattenedValue += siVal;
+                 const tiempoVal = value.tiempo;
+                 if (esValorValido(tiempoVal)) flattenedValue += (flattenedValue ? ` (${tiempoVal})` : tiempoVal);
+                 const obsVal = value.obs || value.observaciones;
+                 if (esValorValido(obsVal)) flattenedValue += ` - Obs: ${obsVal}`;
               }
             }
+
+            if (isFlattenable) {
+               primitives.push([formatLabel(key), flattenedValue.trim()]);
+            } else if (typeof value === 'object' && !Array.isArray(value)) {
+               if (Object.values(value).some(v => esValorValido(v))) {
+                 objects.push([key, value]);
+               }
+            } else {
+              const strVal = String(value);
+              if (strVal.length > 60 || strVal.includes('\n')) {
+                blocks.push([formatLabel(key), strVal]);
+              } else {
+                primitives.push([formatLabel(key), strVal]);
+              }
+            }
+          }
+
+          let primY = doc.y;
+          let leftY = doc.y;
+          for (let i = 0; i < primitives.length; i++) {
+             if (i % 2 === 0) {
+                await checkSpace(25);
+                primY = doc.y;
+                await campo(primitives[i][0], primitives[i][1], 1, primY);
+                leftY = doc.y;
+             } else {
+                await campo(primitives[i][0], primitives[i][1], 2, primY);
+                let rightY = doc.y;
+                doc.y = Math.max(leftY, rightY) + 5;
+             }
+          }
+          if (primitives.length > 0 && primitives.length % 2 !== 0) {
+             doc.y = leftY + 5;
+          }
+
+          for (const b of blocks) {
+             await bloque(b[0], b[1]);
+          }
+
+          for (const o of objects) {
+             await tituloSeccion(formatLabel(o[0]));
+             await imprimirObjetoDinamico(o[1]);
           }
         };
 
