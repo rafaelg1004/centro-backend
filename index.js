@@ -33,7 +33,10 @@ async function initDatabase() {
   );
 }
 
-initDatabase().catch((err) => {
+initDatabase().then(() => {
+  const { initCronJobs } = require("./services/cronJobs");
+  initCronJobs();
+}).catch((err) => {
   console.error("❌ Error inicializando base de datos:", err);
   process.exit(1);
 });
