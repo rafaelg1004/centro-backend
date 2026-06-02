@@ -12,11 +12,18 @@ class PDFReportGenerator {
 
         // --- COLORES INSTITUCIONALES ---
         const COLOR_PRIMARIO = '#4F46E5'; // Indigo-600
-        const COLOR_SECUNDARIO = '#DB2777'; // Pink-600
         const COLOR_TEXTO = '#1F2937'; // Gray-800
         const COLOR_TEXTO_CLARO = '#4B5563'; // Gray-600
-        const COLOR_BG_SECCION = '#EEF2FF'; // Indigo-50
-        const COLOR_LINEA = '#E5E7EB'; // Gray-200
+        const COLOR_BG_SECCION = '#F3F4F6'; // Gray-100
+        const COLOR_LINEA = '#D1D5DB'; // Gray-300
+
+        // --- HELPERS DE LECTURA DE DATOS (Soporta snake_case y camelCase) ---
+        const getVal = (obj, camelKey, snakeKey) => {
+          if (!obj) return null;
+          if (obj[camelKey] !== undefined && obj[camelKey] !== null) return obj[camelKey];
+          if (snakeKey && obj[snakeKey] !== undefined && obj[snakeKey] !== null) return obj[snakeKey];
+          return null;
+        };
 
         // --- HELPERS DE FORMATEO ---
         const calcEdad = (fechaNac) => {
@@ -43,14 +50,9 @@ class PDFReportGenerator {
 
         // --- HELPERS DE DIBUJO ---
         const addPageHeader = async (doc, isFirstPage = false) => {
-          // Si no es la primera página, dejamos espacio, si es la primera hacemos el encabezado completo
           if (isFirstPage) {
-            // Fondo superior
-            doc.rect(0, 0, doc.page.width, 10).fill(COLOR_PRIMARIO);
-            doc.rect(0, 10, doc.page.width, 3).fill(COLOR_SECUNDARIO);
-
-            // LOGO
             let logoOffset = 50;
+            // LOGO
             if (config.logo_url) {
               try {
                 let buffer;
@@ -61,7 +63,7 @@ class PDFReportGenerator {
                   buffer = Buffer.from(config.logo_url.replace(/^data:image\/\w+;base64,/, ''), 'base64');
                 }
                 if (buffer) {
-                  doc.image(buffer, 50, 25, { width: 100 });
+                  doc.image(buffer, 50, 40, { width: 100, fit: [100, 60] });
                   logoOffset = 160;
                 }
               } catch (e) { console.warn("No se pudo cargar el logo:", e.message); }
@@ -69,9 +71,9 @@ class PDFReportGenerator {
 
             // INFO CLINICA
             doc.fillColor(COLOR_PRIMARIO).fontSize(16).font('Helvetica-Bold')
-               .text(config.nombre_clinica || "Clínica", logoOffset, 30);
+               .text(config.nombre_clinica || "Clínica", logoOffset, 45);
             
-            doc.fillColor(COLOR_TEXTO_CLARO).fontSize(8).font('Helvetica')
+            doc.fillColor(COLOR_TEXTO_CLARO).fontSize(9).font('Helvetica')
                .text(config.slogan || "Salud y Bienestar", logoOffset, doc.y + 2);
             
             doc.moveDown(0.5);
@@ -81,14 +83,14 @@ class PDFReportGenerator {
                .text(` | `, { continued: true }).font('Helvetica-Bold').text(`Email: `, { continued: true }).font('Helvetica').text(config.email || "N/A");
 
             // CODIGO HABILITACION (Arriba a la derecha)
-            doc.fontSize(9).font('Helvetica-Bold').fillColor(COLOR_SECUNDARIO)
-               .text(`Habilitación MinSalud: ${config.codigo_habilitacion || "Sin Registro"}`, 50, 30, { align: 'right' });
+            doc.fontSize(9).font('Helvetica-Bold').fillColor(COLOR_TEXTO_CLARO)
+               .text(`Habilitación: ${config.codigo_habilitacion || "Sin Registro"}`, 50, 45, { align: 'right' });
 
-            doc.moveTo(50, 95).lineTo(doc.page.width - 50, 95).strokeColor(COLOR_LINEA).lineWidth(2).stroke();
-            doc.y = 105;
+            doc.moveTo(50, 110).lineTo(doc.page.width - 50, 110).strokeColor(COLOR_PRIMARIO).lineWidth(1.5).stroke();
+            doc.y = 125;
           } else {
-            doc.rect(0, 0, doc.page.width, 5).fill(COLOR_PRIMARIO);
-            doc.y = 30;
+            doc.y = 50;
+            doc.moveTo(50, 40).lineTo(doc.page.width - 50, 40).strokeColor(COLOR_LINEA).lineWidth(0.5).stroke();
           }
         };
 
@@ -103,9 +105,9 @@ class PDFReportGenerator {
           await checkSpace(30);
           doc.moveDown(0.5);
           const y = doc.y;
-          doc.rect(50, y, doc.page.width - 100, 18).fill(COLOR_BG_SECCION);
+          doc.rect(50, y, doc.page.width - 100, 16).fill(COLOR_BG_SECCION);
           doc.fillColor(COLOR_PRIMARIO).fontSize(10).font('Helvetica-Bold')
-             .text(titulo.toUpperCase(), 55, y + 5);
+             .text(titulo.toUpperCase(), 55, y + 4);
           doc.y = y + 25;
           doc.fillColor(COLOR_TEXTO).fontSize(9).font('Helvetica');
         };
@@ -116,7 +118,7 @@ class PDFReportGenerator {
           
           let x = 50;
           if (col === 1) x = 50;
-          if (col === 2) x = 300;
+          if (col === 2) x = doc.page.width / 2 + 10;
 
           if (yPos) {
             doc.font('Helvetica-Bold').fontSize(8.5).text(`${etiqueta}: `, x, yPos, { continued: true })
@@ -149,43 +151,71 @@ class PDFReportGenerator {
           lactancia: "VALORACIÓN Y ASESORÍA DE LACTANCIA",
           perinatal: "VALORACIÓN PROGRAMA PERINATAL"
         };
-        doc.fillColor(COLOR_TEXTO).fontSize(12).font('Helvetica-Bold')
+        doc.fillColor(COLOR_TEXTO).fontSize(13).font('Helvetica-Bold')
            .text(subTitulos[type] || "HISTORIA CLÍNICA", { align: 'center' });
         
-        const fechaAtencion = fmtFecha(valuation.fechaInicioAtencion) || fmtFecha(new Date());
+        const fechaAtencionRaw = getVal(valuation, 'fechaInicioAtencion', 'fecha_inicio_atencion') || getVal(valuation, 'createdAt', 'created_at');
+        const fechaAtencion = fmtFecha(fechaAtencionRaw) || fmtFecha(new Date());
+        const codCups = getVal(valuation, 'codConsulta', 'cod_consulta');
+        
         doc.fillColor(COLOR_TEXTO_CLARO).fontSize(8).font('Helvetica')
-           .text(`FECHA DE ATENCIÓN: ${fechaAtencion}   |   CÓDIGO CUPS: ${valuation.codConsulta || 'N/A'}`, { align: 'center' });
-        doc.moveDown(0.5);
+           .text(`FECHA DE ATENCIÓN: ${fechaAtencion}   |   CÓDIGO CUPS: ${codCups || 'N/A'}`, { align: 'center' });
+        doc.moveDown(1);
 
         // --- DATOS DEL PACIENTE ---
         await tituloSeccion("Ficha de Identificación del Paciente");
 
-        const nombreCompleto = [paciente.nombres, paciente.apellidos].filter(Boolean).join(' ') || 'No especificado';
-        const docId = paciente.numDocumentoIdentificacion
-          ? `${paciente.tipoDocumentoIdentificacion || ''} ${paciente.numDocumentoIdentificacion}`.trim()
-          : (paciente.registroCivil ? `R.C. ${paciente.registroCivil}` : 'N/A');
-        const sexo = paciente.codSexo === 'M' ? 'Masculino' : paciente.codSexo === 'F' ? 'Femenino' : paciente.codSexo;
-        const telefonoPac = paciente.datosContacto?.telefono || paciente.telefono || paciente.celular || 'N/A';
-        const edad = calcEdad(paciente.fechaNacimiento) || 'N/A';
+        const nombres = getVal(paciente, 'nombres', 'nombres') || '';
+        const apellidos = getVal(paciente, 'apellidos', 'apellidos') || '';
+        const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'No especificado';
+        
+        const tipoDoc = getVal(paciente, 'tipoDocumentoIdentificacion', 'tipo_documento_identificacion');
+        const numDoc = getVal(paciente, 'numDocumentoIdentificacion', 'num_documento_identificacion');
+        const regCivil = getVal(paciente, 'registroCivil', 'registro_civil');
+        const docId = numDoc ? `${tipoDoc || ''} ${numDoc}`.trim() : (regCivil ? `R.C. ${regCivil}` : 'N/A');
+        
+        const codSexo = getVal(paciente, 'codSexo', 'cod_sexo');
+        const sexo = codSexo === 'M' ? 'Masculino' : codSexo === 'F' ? 'Femenino' : codSexo;
+        
+        const datosContacto = getVal(paciente, 'datosContacto', 'datos_contacto') || {};
+        const telefonoPac = datosContacto.telefono || getVal(paciente, 'telefono', 'telefono') || getVal(paciente, 'celular', 'celular') || 'N/A';
+        
+        const fechaNac = getVal(paciente, 'fechaNacimiento', 'fecha_nacimiento');
+        const edad = calcEdad(fechaNac) || 'N/A';
+
+        const direccion = getVal(paciente, 'direccion', 'direccion') || datosContacto.direccion;
+        const aseguradora = getVal(paciente, 'aseguradora', 'aseguradora');
 
         const datosPac = [
           ['Nombre del Paciente', nombreCompleto],
           ['Documento Identidad', docId],
-          ['Fecha Nacimiento', fmtFecha(paciente.fechaNacimiento)],
+          ['Fecha Nacimiento', fmtFecha(fechaNac)],
           ['Edad Actual', edad],
           ['Sexo Biológico', sexo],
           ['Teléfono de Contacto', telefonoPac],
-          ['Dirección Residencia', paciente.direccion || 'N/A'],
-          ['Entidad Aseguradora', paciente.aseguradora || 'Particular'],
+          ['Dirección Residencia', direccion || 'N/A'],
+          ['Entidad Aseguradora', aseguradora || 'Particular'],
         ];
 
-        if (!paciente.esAdulto) {
-          if (paciente.nombreMadre) datosPac.push(['Madre', `${paciente.nombreMadre}${paciente.ocupacionMadre ? ` (${paciente.ocupacionMadre})` : ''}`]);
-          if (paciente.nombrePadre) datosPac.push(['Padre', `${paciente.nombrePadre}${paciente.ocupacionPadre ? ` (${paciente.ocupacionPadre})` : ''}`]);
-          if (paciente.pediatra)    datosPac.push(['Médico Pediatra', paciente.pediatra]);
+        const esAdulto = getVal(paciente, 'esAdulto', 'es_adulto');
+        
+        if (!esAdulto) {
+          const nombreMadre = getVal(paciente, 'nombreMadre', 'nombre_madre');
+          const ocupMadre = getVal(paciente, 'ocupacionMadre', 'ocupacion_madre');
+          if (nombreMadre) datosPac.push(['Madre', `${nombreMadre}${ocupMadre ? ` (${ocupMadre})` : ''}`]);
+          
+          const nombrePadre = getVal(paciente, 'nombrePadre', 'nombre_padre');
+          const ocupPadre = getVal(paciente, 'ocupacionPadre', 'ocupacion_padre');
+          if (nombrePadre) datosPac.push(['Padre', `${nombrePadre}${ocupPadre ? ` (${ocupPadre})` : ''}`]);
+          
+          const pediatra = getVal(paciente, 'pediatra', 'pediatra');
+          if (pediatra) datosPac.push(['Médico Pediatra', pediatra]);
         } else {
-          if (paciente.ocupacion)        datosPac.push(['Ocupación Actual', paciente.ocupacion]);
-          if (paciente.semanasGestacion) datosPac.push(['Semanas Gestación', paciente.semanasGestacion]);
+          const ocupacion = getVal(paciente, 'ocupacion', 'ocupacion');
+          if (ocupacion) datosPac.push(['Ocupación Actual', ocupacion]);
+          
+          const semanasGestacion = getVal(paciente, 'semanasGestacion', 'semanas_gestacion');
+          if (semanasGestacion) datosPac.push(['Semanas Gestación', semanasGestacion]);
         }
 
         const startY = doc.y;
@@ -195,22 +225,23 @@ class PDFReportGenerator {
         doc.y = startY + Math.ceil(datosPac.length / 2) * 15 + 10;
 
         // --- MOTIVO DE CONSULTA ---
+        const motivoConsulta = getVal(valuation, 'motivoConsulta', 'motivo_consulta');
         await tituloSeccion("Motivo de Consulta");
         doc.font('Helvetica').fontSize(9).fillColor(COLOR_TEXTO)
-           .text(sanitizeText(valuation.motivoConsulta), { align: 'justify' });
+           .text(sanitizeText(motivoConsulta), { align: 'justify' });
 
         // --- CONTENIDO CLÍNICO DINÁMICO ---
         if (type === 'nino') {
-          const mp = valuation.moduloPediatria || {};
+          const mp = getVal(valuation, 'moduloPediatria', 'modulo_pediatria') || {};
 
           if (mp.prenatales && Object.values(mp.prenatales).some(v => v)) {
             await tituloSeccion("Antecedentes Prenatales");
             const p = mp.prenatales;
-            await campo("Gestación Planeada", p.gestacionPlaneada);
-            await campo("Gestación Controlada", p.gestacionControlada);
-            await campo("Semanas Gestación", p.semanasGestacion);
-            await campo("No. Controles Prenatales", p.numeroControles);
-            await campo("Complicaciones", p.complicacionesEmbarazo || p.complicaciones);
+            await campo("Gestación Planeada", p.gestacionPlaneada || p.gestacion_planeada);
+            await campo("Gestación Controlada", p.gestacionControlada || p.gestacion_controlada);
+            await campo("Semanas Gestación", p.semanasGestacion || p.semanas_gestacion);
+            await campo("No. Controles Prenatales", p.numeroControles || p.numero_controles);
+            await campo("Complicaciones", p.complicacionesEmbarazo || p.complicaciones_embarazo || p.complicaciones);
             await campo("Medicamentos", p.medicamentos);
             await campo("Enfermedades", p.enfermedades);
           }
@@ -225,16 +256,16 @@ class PDFReportGenerator {
             await campo("Temperatura", ex.temperatura, 1, doc.y);
             doc.y += 20;
 
-            await bloque("Tejido Tegumentario", ex.tejidoTegumentario);
-            await bloque("Tono Muscular", ex.tonoMuscular);
-            await bloque("Control Motor", ex.controlMotor);
+            await bloque("Tejido Tegumentario", ex.tejidoTegumentario || ex.tejido_tegumentario);
+            await bloque("Tono Muscular", ex.tonoMuscular || ex.tono_muscular);
+            await bloque("Control Motor", ex.controlMotor || ex.control_motor);
             await bloque("Desplazamientos", ex.desplazamientos);
-            await bloque("Sistema Pulmonar", ex.sistemaPulmonar);
+            await bloque("Sistema Pulmonar", ex.sistemaPulmonar || ex.sistema_pulmonar);
           }
 
         } else if (type === 'adulto') {
-          const mpp = valuation.moduloPisoPelvico || {};
-          const sv  = valuation.signosVitales || {};
+          const mpp = getVal(valuation, 'moduloPisoPelvico', 'modulo_piso_pelvico') || {};
+          const sv  = getVal(valuation, 'signosVitales', 'signos_vitales') || {};
 
           await tituloSeccion("Signos Vitales y Antropometría");
           const svY1 = doc.y;
@@ -244,7 +275,7 @@ class PDFReportGenerator {
           await campo("Presión Arterial", sv.ta, 1, svY2);
           await campo("Temperatura", sv.temperatura, 2, svY2);
           const svY3 = svY2 + 15;
-          await campo("Peso Actual", sv.pesoActual, 1, svY3);
+          await campo("Peso Actual", sv.pesoActual || sv.peso_actual, 1, svY3);
           await campo("Talla", sv.talla, 2, svY3);
           const svY4 = svY3 + 15;
           await campo("IMC", sv.imc, 1, svY4);
@@ -254,29 +285,33 @@ class PDFReportGenerator {
             await tituloSeccion("Historia Ginecobstétrica");
             const ob = mpp.obstetrica;
             await campo("G / P / A / C", `G${ob.gestaciones||0} P${ob.partos||0} A${ob.abortos||0} C${ob.cesareas||0}`);
-            await campo("Fecha Último Parto", ob.fechaUltimoParto);
+            await campo("Fecha Último Parto", ob.fechaUltimoParto || ob.fecha_ultimo_parto);
             await campo("Episiotomía", ob.episiotomia);
             await campo("Desgarro", ob.desgarro);
           }
         } else if (type === 'lactancia') {
-            const ml = valuation.moduloLactancia || {};
+            const ml = getVal(valuation, 'moduloLactancia', 'modulo_lactancia') || {};
             await tituloSeccion("Información de Lactancia");
-            await campo("Tipo de Lactancia", ml.tipoLactancia);
+            await campo("Tipo de Lactancia", ml.tipoLactancia || ml.tipo_lactancia);
             await campo("Dificultades Reportadas", ml.dificultades);
-            await campo("Experiencia Previa", ml.experienciaPrevia || ml.obstetricos?.experienciaLactancia);
+            const expPrevia = ml.experienciaPrevia || ml.experiencia_previa || (ml.obstetricos && ml.obstetricos.experienciaLactancia);
+            await campo("Experiencia Previa", expPrevia);
         } else if (type === 'perinatal') {
-            const mper = valuation.moduloPerinatal || {};
+            const mper = getVal(valuation, 'moduloPerinatal', 'modulo_perinatal') || {};
             await tituloSeccion("Datos de la Gestación Actual");
-            await campo("Semanas de Gestación", mper.semanasGestacion);
+            await campo("Semanas de Gestación", mper.semanasGestacion || mper.semanas_gestacion);
             await campo("Fecha Última Menstruación", mper.fum);
             await campo("Fecha Probable de Parto", mper.fpp);
-            await campo("Médico Tratante", mper.medicoTratante);
+            await campo("Médico Tratante", mper.medicoTratante || mper.medico_tratante);
         }
 
         // --- DIAGNOSTICO Y TRATAMIENTO (Común a todos) ---
         await tituloSeccion("Diagnóstico y Plan de Tratamiento");
-        await bloque("Diagnóstico Fisioterapéutico", valuation.diagnosticoFisioterapeutico);
-        await bloque("Plan de Intervención / Tratamiento", valuation.planTratamiento);
+        const diagnostico = getVal(valuation, 'diagnosticoFisioterapeutico', 'diagnostico_fisioterapeutico');
+        await bloque("Diagnóstico Fisioterapéutico", diagnostico);
+        
+        const plan = getVal(valuation, 'planTratamiento', 'plan_tratamiento');
+        await bloque("Plan de Intervención / Tratamiento", plan);
 
         // --- FIRMAS ---
         await checkSpace(150);
@@ -312,9 +347,10 @@ class PDFReportGenerator {
         const currentY = doc.y;
         
         // Firma Paciente
-        const acudiente = valuation.firmas?.pacienteOAcudiente || {};
+        const firmas = getVal(valuation, 'firmas', 'firmas') || {};
+        const acudiente = firmas.pacienteOAcudiente || firmas.paciente_o_acudiente || {};
         await pintarFirma(
-          acudiente.firmaUrl || null,
+          acudiente.firmaUrl || acudiente.firma_url || null,
           "Firma del Paciente / Representante",
           acudiente.nombre || nombreCompleto,
           `ID: ${acudiente.cedula || docId}`,
@@ -323,30 +359,30 @@ class PDFReportGenerator {
 
         // Firma Profesional
         doc.y = currentY;
-        const profNombre   = profesional.nombre || config.representante_legal || 'Profesional de Salud';
-        const profRegistro = profesional.registroMedico || config.registro_profesional_representante || 'Registro N/A';
-        const profFirmaUrl = profesional.firmaUrl || null;
+        const profNombre   = getVal(profesional, 'nombre', 'nombre') || config.representante_legal || 'Profesional de Salud';
+        const profRegistro = getVal(profesional, 'registroMedico', 'registro_medico') || config.registro_profesional_representante || 'Registro N/A';
+        const profFirmaUrl = getVal(profesional, 'firmaUrl', 'firma_url') || null;
         
         await pintarFirma(
           profFirmaUrl,
           "Firma Profesional Tratante",
           profNombre,
           profRegistro,
-          300, 200
+          doc.page.width / 2 + 10, 200
         );
 
         // --- PIE DE PÁGINA (Añadido al evento de finalizar todas las páginas) ---
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
-          doc.rect(0, doc.page.height - 40, doc.page.width, 40).fill(COLOR_BG_SECCION);
+          doc.rect(0, doc.page.height - 40, doc.page.width, 40).fill('#F9FAFB');
           
           const fechaGen = new Date().toLocaleString('es-CO', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
           
           doc.fillColor(COLOR_TEXTO_CLARO).fontSize(7).font('Helvetica')
              .text(`Generado el: ${fechaGen} | Sistema D'Mamitas | Página ${i + 1} de ${range.count}`, 50, doc.page.height - 25, { align: 'center' });
              
-          doc.fontSize(6).fillColor(COLOR_PRIMARIO)
+          doc.fontSize(6).fillColor(COLOR_TEXTO_CLARO)
              .text('Validez legal conforme a la Ley 527 de 1999 de la República de Colombia. Documento Confidencial.', 50, doc.page.height - 15, { align: 'center' });
         }
 
