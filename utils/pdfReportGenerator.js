@@ -234,79 +234,46 @@ class PDFReportGenerator {
         doc.font('Helvetica').fontSize(9).fillColor(COLOR_TEXTO)
            .text(sanitizeText(motivoConsulta), { align: 'justify' });
 
+        const formatLabel = (key) => {
+          let str = key.replace(/_/g, ' ');
+          str = str.replace(/([A-Z])/g, ' $1');
+          return str.charAt(0).toUpperCase() + str.slice(1).trim().toLowerCase();
+        };
+
+        const imprimirObjetoDinamico = async (obj) => {
+          if (!obj) return;
+          const entries = Object.entries(obj).filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== 'id' && k !== 'valoracion_id');
+          
+          for (const [key, value] of entries) {
+            if (typeof value === 'object' && !Array.isArray(value)) {
+              if (Object.values(value).some(v => v !== null && v !== undefined && v !== '')) {
+                await tituloSeccion(formatLabel(key));
+                await imprimirObjetoDinamico(value);
+              }
+            } else {
+              const strVal = String(value);
+              if (strVal.length > 80 || strVal.includes('\n')) {
+                await bloque(formatLabel(key), strVal);
+              } else {
+                await campo(formatLabel(key), strVal);
+              }
+            }
+          }
+        };
+
         // --- CONTENIDO CLÍNICO DINÁMICO ---
-        if (type === 'nino') {
-          const mp = getVal(valuation, 'moduloPediatria', 'modulo_pediatria') || {};
+        const modulos = ['signosVitales', 'signos_vitales', 'moduloPediatria', 'modulo_pediatria', 'moduloPisoPelvico', 'modulo_piso_pelvico', 'moduloLactancia', 'modulo_lactancia', 'moduloPerinatal', 'modulo_perinatal'];
+        const modulosImpresos = new Set();
+        
+        for (const modName of modulos) {
+          const baseName = modName.replace(/_/g, '').toLowerCase();
+          if (modulosImpresos.has(baseName)) continue;
 
-          if (mp.prenatales && Object.values(mp.prenatales).some(v => v)) {
-            await tituloSeccion("Antecedentes Prenatales");
-            const p = mp.prenatales;
-            await campo("Gestación Planeada", p.gestacionPlaneada || p.gestacion_planeada);
-            await campo("Gestación Controlada", p.gestacionControlada || p.gestacion_controlada);
-            await campo("Semanas Gestación", p.semanasGestacion || p.semanas_gestacion);
-            await campo("No. Controles Prenatales", p.numeroControles || p.numero_controles);
-            await campo("Complicaciones", p.complicacionesEmbarazo || p.complicaciones_embarazo || p.complicaciones);
-            await campo("Medicamentos", p.medicamentos);
-            await campo("Enfermedades", p.enfermedades);
+          if (valuation[modName] && Object.values(valuation[modName]).some(v => v !== null && v !== undefined && v !== '')) {
+            await tituloSeccion(formatLabel(modName));
+            await imprimirObjetoDinamico(valuation[modName]);
+            modulosImpresos.add(baseName);
           }
-
-          if (mp.examen && Object.values(mp.examen).some(v => v)) {
-            await tituloSeccion("Examen Físico Fisioterapéutico");
-            const ex = mp.examen;
-            const svY = doc.y;
-            await campo("Frecuencia Cardíaca", ex.fc, 1, svY);
-            await campo("Frecuencia Respiratoria", ex.fr, 2, svY);
-            doc.y = svY + 15;
-            await campo("Temperatura", ex.temperatura, 1, doc.y);
-            doc.y += 20;
-
-            await bloque("Tejido Tegumentario", ex.tejidoTegumentario || ex.tejido_tegumentario);
-            await bloque("Tono Muscular", ex.tonoMuscular || ex.tono_muscular);
-            await bloque("Control Motor", ex.controlMotor || ex.control_motor);
-            await bloque("Desplazamientos", ex.desplazamientos);
-            await bloque("Sistema Pulmonar", ex.sistemaPulmonar || ex.sistema_pulmonar);
-          }
-
-        } else if (type === 'adulto') {
-          const mpp = getVal(valuation, 'moduloPisoPelvico', 'modulo_piso_pelvico') || {};
-          const sv  = getVal(valuation, 'signosVitales', 'signos_vitales') || {};
-
-          await tituloSeccion("Signos Vitales y Antropometría");
-          const svY1 = doc.y;
-          await campo("Frecuencia Cardíaca", sv.fc, 1, svY1);
-          await campo("Frec. Respiratoria", sv.fr, 2, svY1);
-          const svY2 = svY1 + 15;
-          await campo("Presión Arterial", sv.ta, 1, svY2);
-          await campo("Temperatura", sv.temperatura, 2, svY2);
-          const svY3 = svY2 + 15;
-          await campo("Peso Actual", sv.pesoActual || sv.peso_actual, 1, svY3);
-          await campo("Talla", sv.talla, 2, svY3);
-          const svY4 = svY3 + 15;
-          await campo("IMC", sv.imc, 1, svY4);
-          doc.y = svY4 + 20;
-
-          if (mpp.obstetrica) {
-            await tituloSeccion("Historia Ginecobstétrica");
-            const ob = mpp.obstetrica;
-            await campo("G / P / A / C", `G${ob.gestaciones||0} P${ob.partos||0} A${ob.abortos||0} C${ob.cesareas||0}`);
-            await campo("Fecha Último Parto", ob.fechaUltimoParto || ob.fecha_ultimo_parto);
-            await campo("Episiotomía", ob.episiotomia);
-            await campo("Desgarro", ob.desgarro);
-          }
-        } else if (type === 'lactancia') {
-            const ml = getVal(valuation, 'moduloLactancia', 'modulo_lactancia') || {};
-            await tituloSeccion("Información de Lactancia");
-            await campo("Tipo de Lactancia", ml.tipoLactancia || ml.tipo_lactancia);
-            await campo("Dificultades Reportadas", ml.dificultades);
-            const expPrevia = ml.experienciaPrevia || ml.experiencia_previa || (ml.obstetricos && ml.obstetricos.experienciaLactancia);
-            await campo("Experiencia Previa", expPrevia);
-        } else if (type === 'perinatal') {
-            const mper = getVal(valuation, 'moduloPerinatal', 'modulo_perinatal') || {};
-            await tituloSeccion("Datos de la Gestación Actual");
-            await campo("Semanas de Gestación", mper.semanasGestacion || mper.semanas_gestacion);
-            await campo("Fecha Última Menstruación", mper.fum);
-            await campo("Fecha Probable de Parto", mper.fpp);
-            await campo("Médico Tratante", mper.medicoTratante || mper.medico_tratante);
         }
 
         // --- DIAGNOSTICO Y TRATAMIENTO (Común a todos) ---
@@ -381,7 +348,7 @@ class PDFReportGenerator {
           doc.switchToPage(i);
           doc.rect(0, doc.page.height - 40, doc.page.width, 40).fill('#F9FAFB');
           
-          const fechaGen = new Date().toLocaleString('es-CO', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          const fechaGen = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
           
           doc.fillColor(COLOR_TEXTO_CLARO).fontSize(7).font('Helvetica')
              .text(`Generado el: ${fechaGen} | Sistema D'Mamitas | Página ${i + 1} de ${range.count}`, 50, doc.page.height - 25, { align: 'center' });
