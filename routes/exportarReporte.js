@@ -1,11 +1,12 @@
 const express = require("express");
 const router = express.Router();
-// Modelo unificado - reemplaza todos los modelos de valoración
 const {
   ValoracionFisioterapia,
   Paciente,
   Usuario,
+  ConfiguracionClinica,
 } = require("../models-sequelize");
+
 
 /**
  * GET /api/valoraciones/reporte/exportar-pdf/:id
@@ -64,6 +65,21 @@ router.get("/exportar-pdf/:id", async (req, res) => {
       firmaUrl: creador?.firma_url || null, // null = no se pinta nada
     };
 
+    // Obtener la configuración dinámica de la clínica
+    let configClinica = await ConfiguracionClinica.findOne();
+    if (!configClinica) {
+      // Si no existe, usar valores por defecto (fallback seguro)
+      configClinica = {
+        nombre_clinica: "D'Mamitas & Babies",
+        slogan: "Centro de Estimulación, Fisioterapia y Programas Perinatales",
+        codigo_habilitacion: "Sin Registro",
+        direccion: "Cra 1 W 28-47, Tunja",
+        telefono: "+57 317 2774885"
+      };
+    } else {
+      configClinica = configClinica.toJSON();
+    }
+
     // Intentar cargar el generador de PDF si existe
     try {
       const pdfGenerator = require("../utils/pdfReportGenerator");
@@ -72,6 +88,7 @@ router.get("/exportar-pdf/:id", async (req, res) => {
         paciente,
         reportType,
         profesional,
+        configClinica
       );
       const sanitizedName = (paciente.nombres || "REPORTE").replace(
         /\s+/g,
