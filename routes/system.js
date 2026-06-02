@@ -51,13 +51,24 @@ router.get('/fix-creador', async (req, res) => {
         const { Usuario, ValoracionFisioterapia } = require('../models-sequelize/index');
         const { Op } = require('sequelize');
         
-        // Buscar a la doctora (Dayan Ivonne Villegas)
-        const doctora = await Usuario.findOne({ 
-            where: { nombre: { [Op.iLike]: '%Dayan%' } } 
+        // Buscar a la doctora por varios nombres posibles o tomar el primer administrador
+        let doctora = await Usuario.findOne({ 
+            where: { 
+                [Op.or]: [
+                    { nombre: { [Op.iLike]: '%Dayan%' } },
+                    { nombre: { [Op.iLike]: '%Ivonne%' } },
+                    { email: { [Op.iLike]: '%contacto@dmamitas.com%' } }
+                ]
+            } 
         });
 
+        // Si no se encuentra, tomar el primer usuario creado (suele ser el admin principal)
         if (!doctora) {
-            return res.status(404).json({ message: "No se encontró el usuario de la Doctora Dayan." });
+            doctora = await Usuario.findOne({ order: [['createdAt', 'ASC']] });
+        }
+
+        if (!doctora) {
+            return res.status(404).json({ message: "No hay ningún usuario registrado en el sistema." });
         }
 
         // Actualizar valoraciones donde creado_por sea null
@@ -68,7 +79,7 @@ router.get('/fix-creador', async (req, res) => {
 
         res.json({
             status: 'ok',
-            message: `Se asignaron ${updatedRows} valoraciones a la doctora ${doctora.nombre}`
+            message: `Se asignaron ${updatedRows} valoraciones al usuario: ${doctora.nombre} (ID: ${doctora.id})`
         });
 
     } catch (error) {
