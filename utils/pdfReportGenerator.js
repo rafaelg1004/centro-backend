@@ -53,46 +53,48 @@ class PDFReportGenerator {
         };
 
         // --- HELPERS DE DIBUJO ---
+        const dibujarTablaDosColumnas = async (titulo, campos) => {
+          const numRows = Math.ceil(campos.length / 2);
+          await checkSpace(30 + numRows * 16);
+          const startY = doc.y;
+          const tableWidth = doc.page.width - 100;
+          const colWidth = tableWidth / 2;
+          
+          // Header
+          doc.rect(50, startY, tableWidth, 16).fill('#F3F4F6');
+          doc.fillColor('#1F2937').fontSize(9).font('Helvetica-Bold').text(titulo.toUpperCase(), 55, startY + 4);
+          
+          let currentY = startY + 16;
+          doc.lineWidth(0.5).strokeColor('#D1D5DB');
+          doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          
+          for (let i = 0; i < campos.length; i += 2) {
+             const rowY = currentY;
+             const c1 = campos[i];
+             const c2 = campos[i+1];
+             
+             // Borders
+             doc.moveTo(50, rowY).lineTo(50, rowY + 16).stroke();
+             doc.moveTo(50 + colWidth, rowY).lineTo(50 + colWidth, rowY + 16).stroke();
+             doc.moveTo(50 + tableWidth, rowY).lineTo(50 + tableWidth, rowY + 16).stroke();
+             
+             if (c1) {
+               doc.font('Helvetica-Bold').fontSize(8).fillColor('#374151').text(`${c1[0]}: `, 54, rowY + 4, { continued: true })
+                  .font('Helvetica').fillColor('#4B5563').text(String(c1[1]));
+             }
+             if (c2) {
+               doc.font('Helvetica-Bold').fontSize(8).fillColor('#374151').text(`${c2[0]}: `, 54 + colWidth, rowY + 4, { continued: true })
+                  .font('Helvetica').fillColor('#4B5563').text(String(c2[1]));
+             }
+             
+             currentY += 16;
+             doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          }
+          doc.y = currentY + 10;
+        };
+
         const addPageHeader = async (doc, isFirstPage = false) => {
-          if (isFirstPage) {
-            let logoOffset = 50;
-            // LOGO
-            if (config.logo_url) {
-              try {
-                let buffer;
-                if (config.logo_url.startsWith('http')) {
-                  const resp = await axios.get(config.logo_url, { responseType: 'arraybuffer' });
-                  buffer = Buffer.from(resp.data, 'binary');
-                } else if (config.logo_url.startsWith('data:image')) {
-                  buffer = Buffer.from(config.logo_url.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-                }
-                if (buffer) {
-                  doc.image(buffer, 50, 40, { width: 100, fit: [100, 60] });
-                  logoOffset = 160;
-                }
-              } catch (e) { console.warn("No se pudo cargar el logo:", e.message); }
-            }
-
-            // INFO CLINICA
-            doc.fillColor(COLOR_PRIMARIO).fontSize(16).font('Helvetica-Bold')
-               .text(config.nombre_clinica || "Clínica", logoOffset, 45);
-            
-            doc.fillColor(COLOR_TEXTO_CLARO).fontSize(9).font('Helvetica')
-               .text(config.slogan || "Salud y Bienestar", logoOffset, doc.y + 2);
-            
-            doc.moveDown(0.5);
-            doc.fontSize(8).font('Helvetica-Bold').text(`NIT: `, { continued: true }).font('Helvetica').text(config.nit || "N/A", { continued: true })
-               .text(` | `, { continued: true }).font('Helvetica-Bold').text(`Dir: `, { continued: true }).font('Helvetica').text(config.direccion || "N/A");
-            doc.font('Helvetica-Bold').text(`Tel: `, { continued: true }).font('Helvetica').text(config.telefono || "N/A", { continued: true })
-               .text(` | `, { continued: true }).font('Helvetica-Bold').text(`Email: `, { continued: true }).font('Helvetica').text(config.email || "N/A");
-
-            // CODIGO HABILITACION (Arriba a la derecha)
-            doc.fontSize(9).font('Helvetica-Bold').fillColor(COLOR_TEXTO_CLARO)
-               .text(`Habilitación: ${config.codigo_habilitacion || "Sin Registro"}`, 50, 45, { align: 'right' });
-
-            doc.moveTo(50, 110).lineTo(doc.page.width - 50, 110).strokeColor(COLOR_PRIMARIO).lineWidth(1.5).stroke();
-            doc.y = 125;
-          } else {
+          if (!isFirstPage) {
             doc.y = 50;
             doc.moveTo(50, 40).lineTo(doc.page.width - 50, 40).strokeColor(COLOR_LINEA).lineWidth(0.5).stroke();
           }
@@ -148,6 +150,26 @@ class PDFReportGenerator {
         // --- INICIO DEL DOCUMENTO ---
         await addPageHeader(doc, true);
 
+        // --- DATOS DEL PRESTADOR ---
+        const nitPrestador = config.nit || "901XXXXXX-X";
+        const profPrestador = getVal(profesional, 'nombre', 'nombre');
+        const nombrePrestador = profPrestador || config.nombre_clinica || "D'Mamitas & Babies";
+        const telPrestador = config.telefono || "+57 317 2774885";
+        const codHabPrestador = config.codigo_habilitacion || "1500100XXXX-X";
+        const dirPrestador = config.direccion || "Cra 1 W 28-47, Tunja";
+        const emailPrestador = config.email || "contacto@dmamitas.com";
+        
+        const datosPrestador = [
+          ['NIT', nitPrestador],
+          ['Información del Prestador', nombrePrestador],
+          ['Teléfono', telPrestador],
+          ['Código Hab.', codHabPrestador],
+          ['Dirección de la Sede', dirPrestador],
+          ['Email', emailPrestador]
+        ];
+        
+        await dibujarTablaDosColumnas("DATOS DEL PRESTADOR", datosPrestador);
+
         // --- TITULO DEL REPORTE ---
         const subTitulos = {
           nino:      "VALORACIÓN DE INGRESO PEDIÁTRICA",
@@ -162,7 +184,6 @@ class PDFReportGenerator {
           if (!d) return null;
           try {
             const date = new Date(d);
-            // Formato YYYY-MM-DD HH:mm:ss
             const yyyy = date.getFullYear();
             const mm = String(date.getMonth() + 1).padStart(2, '0');
             const dd = String(date.getDate()).padStart(2, '0');
@@ -182,8 +203,6 @@ class PDFReportGenerator {
         doc.moveDown(1);
 
         // --- DATOS DEL PACIENTE ---
-        await tituloSeccion("Ficha de Identificación del Paciente");
-
         const nombres = getVal(paciente, 'nombres', 'nombres') || '';
         const apellidos = getVal(paciente, 'apellidos', 'apellidos') || '';
         const nombreCompleto = `${nombres} ${apellidos}`.trim() || 'No especificado';
@@ -211,25 +230,22 @@ class PDFReportGenerator {
           ['Fecha Nacimiento', fmtFecha(fechaNac)],
           ['Edad Actual', edad],
           ['Sexo Biológico', sexo],
-          ['Teléfono de Contacto', telefonoPac],
-          ['Dirección Residencia', direccion || 'N/A'],
-          ['Entidad Aseguradora', aseguradora || 'Particular'],
+          ['Teléfono', telefonoPac],
+          ['Dirección', direccion || 'N/A'],
+          ['Aseguradora', aseguradora || 'Particular'],
         ];
 
         const estadoCivil = getVal(paciente, 'estadoCivil', 'estado_civil');
         if (estadoCivil) datosPac.push(['Estado Civil', estadoCivil]);
 
         const ocupacion = getVal(paciente, 'ocupacion', 'ocupacion');
-        if (ocupacion) datosPac.push(['Ocupación Actual', ocupacion]);
+        if (ocupacion) datosPac.push(['Ocupación', ocupacion]);
         
         const regimen = getVal(paciente, 'regimen', 'regimen');
         if (regimen) datosPac.push(['Régimen', regimen]);
 
-        const startY = doc.y;
-        datosPac.forEach((r, i) => {
-          campo(r[0], r[1], (i % 2 === 0) ? 1 : 2, startY + Math.floor(i / 2) * 15);
-        });
-        doc.y = startY + Math.ceil(datosPac.length / 2) * 15 + 10;
+        // Draw patient table
+        await dibujarTablaDosColumnas("DATOS DEL PACIENTE", datosPac);
 
         // --- MOTIVO DE CONSULTA ---
         const motivoConsulta = getVal(valuation, 'motivoConsulta', 'motivo_consulta');
