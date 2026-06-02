@@ -42,4 +42,7 @@ router.get('/health', async (req, res) => {
             timestamp: new Date().toISOString(),
             error: error.message
         });
+    }
+});
+
 module.exports = router;

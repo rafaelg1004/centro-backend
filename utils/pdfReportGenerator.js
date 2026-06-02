@@ -385,21 +385,8 @@ class PDFReportGenerator {
           doc.moveTo(xPos, doc.y - 30).lineTo(xPos + width, doc.y - 30).strokeColor(COLOR_TEXTO).lineWidth(0.5).stroke();
         };
 
-        const currentY = doc.y;
-        
-        // Firma Paciente
-        const firmas = getVal(valuation, 'firmas', 'firmas') || {};
-        const acudiente = firmas.pacienteOAcudiente || firmas.paciente_o_acudiente || {};
-        await pintarFirma(
-          acudiente.firmaUrl || acudiente.firma_url || null,
-          "Firma del Paciente / Representante",
-          acudiente.nombre || nombreCompleto,
-          `ID: ${acudiente.cedula || docId}`,
-          50, 200
-        );
-
         // Firma Profesional
-        doc.y = currentY;
+        await checkSpace(50); // Asegurar que hay espacio para la firma
         const profNombre   = getVal(profesional, 'nombre', 'nombre') || config.representante_legal || 'Profesional de Salud';
         const profRegistro = getVal(profesional, 'registroMedico', 'registro_medico') || config.registro_profesional_representante || 'Registro N/A';
         const profFirmaUrl = getVal(profesional, 'firmaUrl', 'firma_url') || null;
@@ -409,7 +396,7 @@ class PDFReportGenerator {
           "Firma Profesional Tratante",
           profNombre,
           profRegistro,
-          doc.page.width / 2 + 10, 200
+          50, 200
         );
 
         // --- PIE DE PÁGINA (Añadido al evento de finalizar todas las páginas) ---
