@@ -45,47 +45,4 @@ router.get('/health', async (req, res) => {
     }
 });
 
-// Endpoint temporal para arreglar valoraciones sin creador
-router.get('/fix-creador', async (req, res) => {
-    try {
-        const { Usuario, ValoracionFisioterapia } = require('../models-sequelize/index');
-        const { Op } = require('sequelize');
-        
-        // Buscar a la doctora por varios nombres posibles o tomar el primer administrador
-        let doctora = await Usuario.findOne({ 
-            where: { 
-                [Op.or]: [
-                    { nombre: { [Op.iLike]: '%Dayan%' } },
-                    { nombre: { [Op.iLike]: '%Ivonne%' } },
-                    { email: { [Op.iLike]: '%contacto@dmamitas.com%' } }
-                ]
-            } 
-        });
-
-        // Si no se encuentra, tomar el primer usuario creado (suele ser el admin principal)
-        if (!doctora) {
-            doctora = await Usuario.findOne({ order: [['createdAt', 'ASC']] });
-        }
-
-        if (!doctora) {
-            return res.status(404).json({ message: "No hay ningún usuario registrado en el sistema." });
-        }
-
-        // Actualizar valoraciones donde creado_por sea null
-        const [updatedRows] = await ValoracionFisioterapia.update(
-            { creado_por: doctora.id },
-            { where: { creado_por: null } }
-        );
-
-        res.json({
-            status: 'ok',
-            message: `Se asignaron ${updatedRows} valoraciones al usuario: ${doctora.nombre} (ID: ${doctora.id})`
-        });
-
-    } catch (error) {
-        console.error('Error fixing creador:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 module.exports = router;
