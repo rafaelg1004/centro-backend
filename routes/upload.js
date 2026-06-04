@@ -31,7 +31,10 @@ const upload = multer({
       // Limpiar el origen de caracteres raros
       origen = origen.replace(/[^a-zA-Z0-9_-]/g, '');
 
-      const folderPath = `${year}/${semester}/${month}/${origen}`;
+      let identificador = req.query.id || req.body.id || 'sin_id';
+      identificador = identificador.replace(/[^a-zA-Z0-9_-]/g, '');
+
+      const folderPath = `${year}/${semester}/${month}/${origen}/${identificador}`;
       const fileName = `${Date.now()}-${file.originalname}`;
       
       cb(null, `${folderPath}/${fileName}`);
