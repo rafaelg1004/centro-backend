@@ -168,6 +168,39 @@ const crearSesionesEnCascada = async (valId, pacienteId, plan) => {
   }
 };
 
+const mapValoracionData = (body) => {
+  const mapped = { ...body }; // Keep original fields just in case
+  
+  if (body.paciente) mapped.paciente_id = body.paciente;
+  if (body.tipoPrograma !== undefined) mapped.tipo_programa = body.tipoPrograma;
+  if (body.fechaInicioAtencion !== undefined) mapped.fecha_inicio_atencion = body.fechaInicioAtencion;
+  if (body.numAutorizacion !== undefined) mapped.num_autorizacion = body.numAutorizacion;
+  if (body.codConsulta !== undefined) mapped.cod_consulta = body.codConsulta;
+  if (body.modalidadGrupoServicioTecSal !== undefined) mapped.modalidad_grupo_servicio_tec_sal = body.modalidadGrupoServicioTecSal;
+  if (body.grupoServicios !== undefined) mapped.grupo_servicios = body.grupoServicios;
+  if (body.finalidadTecnologiaSalud !== undefined) mapped.finalidad_tecnologia_salud = body.finalidadTecnologiaSalud;
+  if (body.causaMotivoAtencion !== undefined) mapped.causa_motivo_atencion = body.causaMotivoAtencion;
+  if (body.codDiagnosticoPrincipal !== undefined) mapped.cod_diagnostico_principal = body.codDiagnosticoPrincipal;
+  if (body.tipoDiagnosticoPrincipal !== undefined) mapped.tipo_diagnostico_principal = body.tipoDiagnosticoPrincipal;
+  if (body.vrServicio !== undefined) mapped.vr_servicio = body.vrServicio;
+  if (body.conceptoRecaudo !== undefined) mapped.concepto_recaudo = body.conceptoRecaudo;
+  if (body.motivoConsulta !== undefined) mapped.motivo_consulta = body.motivoConsulta;
+  if (body.enfermedadActual !== undefined) mapped.enfermedad_actual = body.enfermedadActual;
+  if (body.signosVitales !== undefined) mapped.signos_vitales = body.signosVitales;
+  if (body.moduloPediatria !== undefined) mapped.modulo_pediatria = body.moduloPediatria;
+  if (body.moduloPisoPelvico !== undefined) mapped.modulo_piso_pelvico = body.moduloPisoPelvico;
+  if (body.moduloLactancia !== undefined) mapped.modulo_lactancia = body.moduloLactancia;
+  if (body.moduloPerinatal !== undefined) mapped.modulo_perinatal = body.moduloPerinatal;
+  if (body.examenFisico !== undefined) mapped.examen_fisico = body.examenFisico;
+  if (body.diagnosticoFisioterapeutico !== undefined) mapped.diagnostico_fisioterapeutico = body.diagnosticoFisioterapeutico;
+  if (body.planTratamiento !== undefined) mapped.plan_tratamiento = body.planTratamiento;
+  if (body.fechaBloqueo !== undefined) mapped.fecha_bloqueo = body.fechaBloqueo;
+  if (body.selloIntegridad !== undefined) mapped.sello_integridad = body.selloIntegridad;
+  if (body.auditTrail !== undefined) mapped.audit_trail = body.auditTrail;
+
+  return mapped;
+};
+
 /**
  * @route   POST /api/valoraciones
  * @desc    Crear una nueva valoraciÃ³n unificada (PediatrÃ­a, Piso PÃ©lvico o Lactancia)
@@ -221,10 +254,11 @@ router.post("/", validarImagenes, async (req, res) => {
       }
     }
 
+    const dataToSave = mapValoracionData(req.body);
+
     const valoracionGuardada = await ValoracionFisioterapia.create({
-      ...req.body,
-      fecha_inicio_atencion: new Date(),
-      fechaInicioAtencion: new Date(),
+      ...dataToSave,
+      fecha_inicio_atencion: dataToSave.fecha_inicio_atencion || new Date(),
       creado_por: req.usuario?.id || null,
     });
 
@@ -768,7 +802,8 @@ router.put(
         }
       }
 
-      await valoracionActual.update(req.body);
+      const dataToUpdate = mapValoracionData(req.body);
+      await valoracionActual.update(dataToUpdate);
 
       if (planDiferido) {
         try {
