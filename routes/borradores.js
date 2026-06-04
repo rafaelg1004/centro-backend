@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { BorradorFormulario } = require('../models-sequelize');
 const { verificarBloqueo } = require('../utils/hcMiddleware');
+const { Op } = require('sequelize');
 
 // Obtener todos los borradores del usuario actual (para notificación en Home)
 router.get('/mis-borradores', async (req, res) => {

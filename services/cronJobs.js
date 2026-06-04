@@ -92,10 +92,33 @@ const cerrarHistoriasAntiguas = async () => {
   }
 };
 
+const limpiarBorradoresAbandonados = async () => {
+  try {
+    // Definimos qué es "mucho tiempo" (por ejemplo: 2 días)
+    const limiteDias = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const cantidadBorrados = await require('../models-sequelize').BorradorFormulario.destroy({
+      where: {
+        updatedAt: {
+          [Op.lt]: limiteDias
+        }
+      }
+    });
+    
+    if (cantidadBorrados > 0) {
+      console.log(`[Cron] Limpieza automática: Se borraron ${cantidadBorrados} borradores abandonados (más de 2 días).`);
+    }
+  } catch (error) {
+    console.error("[Cron] Error limpiando borradores abandonados:", error);
+  }
+};
+
 const initCronJobs = () => {
   // Ejecutar todos los días a la medianoche
-  cron.schedule('0 0 * * *', cerrarHistoriasAntiguas);
-  console.log('✅ Cron Jobs inicializados (Cierre automático de historias a las 00:00 activado)');
+  cron.schedule('0 0 * * *', () => {
+    cerrarHistoriasAntiguas();
+    limpiarBorradoresAbandonados();
+  });
+  console.log('✅ Cron Jobs inicializados (Cierre automático y limpieza de borradores activados)');
 };
 
 module.exports = {
