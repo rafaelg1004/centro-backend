@@ -591,10 +591,10 @@ router.get("/me", verificarToken(), async (req, res) => {
       id: usuario.id,
       nombre: usuario.nombre,
       email: usuario.email,
-      usuario: usuario.usuario,
+      usuario: usuario.username,
       rol: usuario.rol,
-      registro_medico: usuario.registro_medico,
-      firma_url: usuario.firma_url || null,
+      registroMedico: usuario.registro_medico,
+      firmaUrl: usuario.firma_url || null,
       two_factor_enabled: usuario.two_factor_enabled,
       ultimo_acceso: usuario.ultimo_acceso,
     });
@@ -722,21 +722,19 @@ router.put("/me", verificarToken(), async (req, res) => {
     const actualizacion = {};
     if (nombre !== undefined) actualizacion.nombre = nombre;
     if (registroMedico !== undefined)
-      actualizacion.registroMedico = registroMedico;
-    if (firmaUrl !== undefined) actualizacion.firmaUrl = firmaUrl;
+      actualizacion.registro_medico = registroMedico;
+    if (firmaUrl !== undefined) actualizacion.firma_url = firmaUrl;
 
     const usuario = await Usuario.findByPk(req.usuario.id);
     if (!usuario)
       return res.status(404).json({ error: "Usuario no encontrado" });
     await usuario.update(actualizacion);
-    if (!usuario)
-      return res.status(404).json({ error: "Usuario no encontrado" });
 
     res.json({
       id: usuario.id,
       nombre: usuario.nombre,
-      registroMedico: usuario.registroMedico,
-      firmaUrl: usuario.firmaUrl || null,
+      registroMedico: usuario.registro_medico,
+      firmaUrl: usuario.firma_url || null,
     });
   } catch (error) {
     console.error("Error actualizando perfil:", error);
