@@ -41,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       firma_url: {
-        type: DataTypes.STRING(500),
+        type: DataTypes.TEXT,
         allowNull: true,
       },
       two_factor_enabled: {

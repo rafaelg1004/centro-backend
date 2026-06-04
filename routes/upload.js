@@ -21,7 +21,20 @@ const upload = multer({
     bucket: process.env.AWS_BUCKET_NAME,
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
-      cb(null, Date.now() + '-' + file.originalname);
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const semester = now.getMonth() < 6 ? 'Semestre1' : 'Semestre2';
+      
+      // Intentar obtener el origen de query, luego body, por defecto 'general'
+      let origen = req.query.origen || req.body.origen || 'general';
+      // Limpiar el origen de caracteres raros
+      origen = origen.replace(/[^a-zA-Z0-9_-]/g, '');
+
+      const folderPath = `${year}/${semester}/${month}/${origen}`;
+      const fileName = `${Date.now()}-${file.originalname}`;
+      
+      cb(null, `${folderPath}/${fileName}`);
     }
   })
 });
