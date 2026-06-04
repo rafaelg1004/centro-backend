@@ -31,6 +31,14 @@ async function initDatabase() {
       .filter((k) => k !== "sequelize")
       .join(", ")}`,
   );
+
+  // Asegurar que la tabla de borradores existe sin alterar destructivamente el resto
+  try {
+    await models.BorradorFormulario.sync({ alter: true });
+    console.log("✅ Tabla de borradores sincronizada correctamente");
+  } catch (error) {
+    console.error("❌ Error sincronizando tabla de borradores:", error);
+  }
 }
 
 initDatabase().then(() => {
