@@ -71,8 +71,19 @@ router.post("/", async (req, res) => {
       // Si no vienen nombres/apellidos separados, intentar separar nombres
       nombres: req.body.nombres,
       apellidos: req.body.apellidos || (req.body.nombres ? "" : "SIN APELLIDO"),
-      // Sanitizar esAdulto para evitar errores de casteo (especialmente con strings vacÃos)
+      // Sanitizar esAdulto para evitar errores de casteo (especialmente con strings vacíos)
       es_adulto: req.body.esAdulto === true || req.body.esAdulto === "true",
+      fecha_nacimiento: req.body.fechaNacimiento,
+      cod_sexo: req.body.codSexo,
+      lugar_nacimiento: req.body.lugarNacimiento,
+      estado_civil: req.body.estadoCivil,
+      nivel_educativo: req.body.nivelEducativo,
+      medico_tratante: req.body.medicoTratante,
+      estado_embarazo: req.body.estadoEmbarazo,
+      nombre_bebe: req.body.nombreBebe,
+      fum: req.body.fum,
+      semanas_gestacion: req.body.semanasGestacion,
+      fecha_probable_parto: req.body.fechaProbableParto,
     };
 
     // Mapear datos de contacto si vienen en formato plano (legacy)

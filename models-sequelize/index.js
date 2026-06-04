@@ -21,10 +21,12 @@ const defineUsuario = require("./Usuario");
 const defineCIE10 = require("./CIE10");
 const defineCupsCatalogo = require("./CupsCatalogo");
 const defineConfiguracionClinica = require("./ConfiguracionClinica");
+const defineBorradorFormulario = require("./BorradorFormulario");
 
 // Definir modelos
 const Paciente = definePaciente(sequelize, DataTypes);
 const ConfiguracionClinica = defineConfiguracionClinica(sequelize, DataTypes);
+const BorradorFormulario = defineBorradorFormulario(sequelize, DataTypes);
 const CodigoCUPS = defineCodigoCUPS(sequelize, DataTypes);
 const ValoracionFisioterapia = defineValoracionFisioterapia(
   sequelize,
@@ -172,4 +174,5 @@ module.exports = {
   CIE10,
   CupsCatalogo,
   ConfiguracionClinica,
+  BorradorFormulario,
 };

@@ -68,6 +68,7 @@ app.use(
   verificarToken(),
   require("./routes/valoraciones"),
 );
+app.use("/api/borradores", verificarToken(), require("./routes/borradores"));
 
 // Academia y Pagos
 app.use("/api/clases", verificarToken(), require("./routes/clases"));
