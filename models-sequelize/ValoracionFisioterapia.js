@@ -31,7 +31,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       num_autorizacion: DataTypes.STRING(50),
       cod_consulta: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(255),
         allowNull: true,
       },
       modalidad_grupo_servicio_tec_sal: {
@@ -51,7 +51,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       cod_diagnostico_principal: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(255),
         allowNull: true,
       },
       tipo_diagnostico_principal: {
