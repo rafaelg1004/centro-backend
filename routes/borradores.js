@@ -7,7 +7,7 @@ const { Op } = require('sequelize');
 // Obtener todos los borradores del usuario actual (para notificación en Home)
 router.get('/mis-borradores', async (req, res) => {
     try {
-        const usuarioId = req.usuario.usuario || req.usuario.username || req.usuario.id;
+        const usuarioId = req.usuario.id || req.usuario.usuario || req.usuario.username;
         if (!usuarioId) {
             return res.status(401).json({ mensaje: "Usuario no autenticado." });
         }
@@ -26,7 +26,7 @@ router.get('/mis-borradores', async (req, res) => {
 // Obtener un borrador específico por ID
 router.get('/:id', async (req, res) => {
     try {
-        const usuarioId = req.usuario.usuario || req.usuario.username || req.usuario.id;
+        const usuarioId = req.usuario.id || req.usuario.usuario || req.usuario.username;
         const borrador = await BorradorFormulario.findOne({
             where: {
                 id: req.params.id,
@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
 // Crear o actualizar un borrador (Autoguardado)
 router.post('/', async (req, res) => {
     try {
-        const usuarioId = req.usuario.usuario || req.usuario.username || req.usuario.id;
+        const usuarioId = req.usuario.id || req.usuario.usuario || req.usuario.username;
         const { pacienteId, tipoFormulario, nombrePaciente, datos } = req.body;
 
         if (!pacienteId || !tipoFormulario || !datos) {
@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
 // Eliminar un borrador (al finalizar la valoración)
 router.delete('/limpiar/:pacienteId/:tipoFormulario', async (req, res) => {
     try {
-        const usuarioId = req.usuario.usuario || req.usuario.username || req.usuario.id;
+        const usuarioId = req.usuario.id || req.usuario.usuario || req.usuario.username;
         const borrador = await BorradorFormulario.findOne({
             where: {
                 pacienteId: req.params.pacienteId,
@@ -111,7 +111,7 @@ router.delete('/limpiar/:pacienteId/:tipoFormulario', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
     try {
-        const usuarioId = req.usuario.usuario || req.usuario.username || req.usuario.id;
+        const usuarioId = req.usuario.id || req.usuario.usuario || req.usuario.username;
         const borrador = await BorradorFormulario.findOne({
             where: {
                 id: req.params.id,

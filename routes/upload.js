@@ -53,7 +53,7 @@ router.post('/upload', upload.single('imagen'), (req, res) => {
 const extraerKeyDeUrl = (urlStr) => {
   try {
     const url = new URL(urlStr);
-    return url.pathname.substring(1); // Remover el primer "/"
+    return decodeURIComponent(url.pathname.substring(1)); // Remover el primer "/" y decodificar caracteres especiales
   } catch (error) {
     return null;
   }
