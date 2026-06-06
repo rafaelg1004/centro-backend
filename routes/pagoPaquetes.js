@@ -9,10 +9,12 @@ const {
 const { Op } = require("sequelize");
 
 router.post("/", async (req, res) => {
+  console.log("Datos recibidos para nuevo paquete:", req.body);
   try {
     const nuevo = await PagoPaquete.create(req.body);
     res.status(201).json(nuevo);
   } catch (e) {
+    console.error("Error al crear paquete:", e);
     res.status(500).json({ error: e.message });
   }
 });
