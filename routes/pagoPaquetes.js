@@ -364,4 +364,72 @@ router.post("/recalcular", async (req, res) => {
   }
 });
 
+// Diagnóstico: auditar sesiones de un paquete por número de factura
+router.get("/diagnostico/:numero_factura", async (req, res) => {
+  try {
+    const { numero_factura } = req.params;
+
+    const paquete = await PagoPaquete.findOne({
+      where: { numero_factura },
+      include: [{ model: Paciente, as: "paciente" }],
+    });
+
+    if (!paquete) {
+      return res.status(404).json({ error: "Paquete no encontrado" });
+    }
+
+    // Todas las sesiones que usan esta factura
+    const sesiones = await ClaseNino.findAll({
+      where: { numero_factura },
+      include: [
+        {
+          model: Clase,
+          as: "clase",
+        },
+        {
+          model: Paciente,
+          as: "paciente",
+          attributes: ["id", "nombres", "apellidos", "num_documento_identificacion"],
+        },
+      ],
+      order: [["created_at", "ASC"]],
+    });
+
+    const realUsadas = sesiones.length;
+
+    res.json({
+      paquete: {
+        id: paquete.id,
+        paciente: paquete.paciente,
+        numero_factura: paquete.numero_factura,
+        clases_pagadas: paquete.clases_pagadas,
+        clases_usadas_guardado: paquete.clases_usadas,
+        clases_usadas_real: realUsadas,
+        diferencia: realUsadas - paquete.clases_usadas,
+        estado_db: paquete.clases_usadas >= paquete.clases_pagadas ? "Agotado" : "Activo",
+        estado_real: realUsadas >= paquete.clases_pagadas ? "Agotado" : "Activo",
+        fecha_pago: paquete.fecha_pago,
+        created_at: paquete.createdAt,
+        updated_at: paquete.updatedAt,
+      },
+      sesiones: sesiones.map((s) => ({
+        id: s.id,
+        clase_id: s.clase_id,
+        clase_nombre: s.clase?.nombre,
+        clase_fecha: s.clase?.fecha,
+        paciente_id: s.paciente_id,
+        paciente_nombre: s.paciente
+          ? `${s.paciente.nombres} ${s.paciente.apellidos}`
+          : null,
+        numero_factura: s.numero_factura,
+        created_at: s.createdAt,
+        updated_at: s.updatedAt,
+      })),
+    });
+  } catch (e) {
+    console.error("Error en diagnostico:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
