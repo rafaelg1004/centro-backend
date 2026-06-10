@@ -11,6 +11,23 @@ const { Op } = require("sequelize");
 router.post("/", async (req, res) => {
   console.log("Datos recibidos para nuevo paquete:", req.body);
   try {
+    const { numero_factura } = req.body;
+
+    if (!numero_factura || !numero_factura.trim()) {
+      return res.status(400).json({ error: "El número de factura es obligatorio" });
+    }
+
+    // Validar que no exista ya un paquete con este número de factura
+    const facturaExistente = await PagoPaquete.findOne({
+      where: { numero_factura: numero_factura.trim() },
+    });
+
+    if (facturaExistente) {
+      return res.status(400).json({
+        error: `Ya existe un paquete con el número de factura ${numero_factura.trim()}`,
+      });
+    }
+
     const nuevo = await PagoPaquete.create(req.body);
     res.status(201).json(nuevo);
   } catch (e) {
