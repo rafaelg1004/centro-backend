@@ -81,20 +81,29 @@ router.get("/reporte", async (req, res) => {
           include: [{ model: Clase, as: "clase" }],
         });
 
+        const clasesDisponibles = paquete.clases_pagadas - paquete.clases_usadas;
+        const porcentajeUso = paquete.clases_pagadas > 0
+          ? Math.round((paquete.clases_usadas / paquete.clases_pagadas) * 100)
+          : 0;
+
         return {
           id: paquete.id,
           paciente: {
             id: paquete.paciente.id,
             nombres: paquete.paciente.nombres,
             apellidos: paquete.paciente.apellidos,
+            num_documento_identificacion: paquete.paciente.num_documento_identificacion,
+            cod_sexo: paquete.paciente.cod_sexo,
+            fecha_nacimiento: paquete.paciente.fecha_nacimiento,
+            datos_contacto: paquete.paciente.datos_contacto,
           },
           numero_factura: paquete.numero_factura,
           clases_pagadas: paquete.clases_pagadas,
           clases_usadas: paquete.clases_usadas,
-          clases_disponibles: paquete.clases_pagadas - paquete.clases_usadas,
-          porcentaje_uso: Math.round(
-            (paquete.clases_usadas / paquete.clases_pagadas) * 100,
-          ),
+          clases_disponibles: clasesDisponibles,
+          clasesDisponibles: clasesDisponibles,
+          porcentaje_uso: porcentajeUso,
+          porcentajeUso: porcentajeUso,
           fecha_pago: paquete.fecha_pago,
           estado:
             paquete.clases_usadas >= paquete.clases_pagadas
@@ -105,7 +114,17 @@ router.get("/reporte", async (req, res) => {
             nombre: cn.clase?.nombre,
             fecha: cn.clase?.fecha,
           })),
+          clasesConPaquete: clasesConPaquete.map((cn) => ({
+            id: cn.clase?.id,
+            nombre: cn.clase?.nombre,
+            fecha: cn.clase?.fecha,
+          })),
           clases_sin_paquete: clasesSinPaquete.map((cn) => ({
+            id: cn.clase?.id,
+            nombre: cn.clase?.nombre,
+            fecha: cn.clase?.fecha,
+          })),
+          clasesSinPaquete: clasesSinPaquete.map((cn) => ({
             id: cn.clase?.id,
             nombre: cn.clase?.nombre,
             fecha: cn.clase?.fecha,
