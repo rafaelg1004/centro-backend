@@ -41,13 +41,15 @@ router.post("/:id/agregar-nino", async (req, res) => {
         if (!paquete)
           return res.status(404).json({ error: "Factura no encontrada" });
 
-        if (paquete.clases_usadas >= paquete.clases_pagadas) {
+        // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
+        const usadasReales = await ClaseNino.count({
+          where: { numero_factura },
+        });
+        if (usadasReales >= paquete.clases_pagadas) {
           return res
             .status(400)
             .json({ error: "No quedan clases disponibles en este paquete" });
         }
-
-        await paquete.update({ clases_usadas: paquete.clases_usadas + 1 });
 
         // Crear relación clase-niño con factura
         await ClaseNino.create({
@@ -56,6 +58,12 @@ router.post("/:id/agregar-nino", async (req, res) => {
           numero_factura,
           firma,
         });
+
+        // Sincronizar contador con conteo real
+        const nuevoConteo = await ClaseNino.count({
+          where: { numero_factura },
+        });
+        await paquete.update({ clases_usadas: nuevoConteo });
       } else {
         // Crear relación clase-niño sin factura
         await ClaseNino.create({
@@ -117,15 +125,24 @@ router.post("/:id/asignar-paquete", async (req, res) => {
     if (!paquete)
       return res.status(404).json({ error: "Factura no encontrada" });
 
-    if (paquete.clases_usadas >= paquete.clases_pagadas) {
+    // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
+    const usadasReales = await ClaseNino.count({
+      where: { numero_factura },
+    });
+    if (usadasReales >= paquete.clases_pagadas) {
       return res
         .status(400)
         .json({ error: "No quedan clases disponibles en este paquete" });
     }
 
-    // Asignar el paquete y descontar una clase
+    // Asignar el paquete
     await ninoClase.update({ numero_factura });
-    await paquete.update({ clases_usadas: paquete.clases_usadas + 1 });
+
+    // Sincronizar contador con conteo real
+    const nuevoConteo = await ClaseNino.count({
+      where: { numero_factura },
+    });
+    await paquete.update({ clases_usadas: nuevoConteo });
 
     const claseActualizada = await Clase.findByPk(req.params.id, {
       include: [
@@ -290,18 +307,23 @@ router.post("/:id/eliminar-nino", async (req, res) => {
     if (!ninoClase)
       return res.status(404).json({ error: "Niño no encontrado en la clase" });
 
-    // Si tiene factura, resta una clase usada
-    if (ninoClase.numero_factura) {
-      const paquete = await PagoPaquete.findOne({
-        where: { numero_factura: ninoClase.numero_factura },
-      });
-      if (paquete && paquete.clases_usadas > 0) {
-        await paquete.update({ clases_usadas: paquete.clases_usadas - 1 });
-      }
-    }
+    const facturaEliminada = ninoClase.numero_factura;
 
     // Elimina el niño de la clase
     await ninoClase.destroy();
+
+    // Recalcular contador del paquete con conteo real
+    if (facturaEliminada) {
+      const paquete = await PagoPaquete.findOne({
+        where: { numero_factura: facturaEliminada },
+      });
+      if (paquete) {
+        const nuevoConteo = await ClaseNino.count({
+          where: { numero_factura: facturaEliminada },
+        });
+        await paquete.update({ clases_usadas: nuevoConteo });
+      }
+    }
 
     const claseActualizada = await Clase.findByPk(req.params.id, {
       include: [
@@ -335,20 +357,29 @@ router.delete("/:id", async (req, res) => {
       where: { clase_id: req.params.id },
     });
 
-    // Por cada niño, si tiene numero_factura, resta 1 a clases_usadas en el paquete
+    // Recopilar facturas únicas para recalcular después
+    const facturasAfectadas = new Set();
     for (const ninoClase of ninosClase) {
       if (ninoClase.numero_factura) {
-        const paquete = await PagoPaquete.findOne({
-          where: { numero_factura: ninoClase.numero_factura },
-        });
-        if (paquete && paquete.clases_usadas > 0) {
-          await paquete.update({ clases_usadas: paquete.clases_usadas - 1 });
-        }
+        facturasAfectadas.add(ninoClase.numero_factura);
       }
     }
 
     // Eliminar todas las relaciones clase-niño
     await ClaseNino.destroy({ where: { clase_id: req.params.id } });
+
+    // Recalcular contadores de paquetes afectados
+    for (const numFactura of facturasAfectadas) {
+      const paquete = await PagoPaquete.findOne({
+        where: { numero_factura: numFactura },
+      });
+      if (paquete) {
+        const nuevoConteo = await ClaseNino.count({
+          where: { numero_factura: numFactura },
+        });
+        await paquete.update({ clases_usadas: nuevoConteo });
+      }
+    }
 
     // Eliminar la clase
     await clase.destroy();

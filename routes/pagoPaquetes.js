@@ -180,13 +180,19 @@ router.post("/usar-clase", async (req, res) => {
     if (!paquete) {
       return res.status(404).json({ error: "Paquete no encontrado" });
     }
-    if (paquete.clases_usadas >= paquete.clases_pagadas) {
+
+    // Validar contra conteo REAL de ClaseNino
+    const usadasReales = await ClaseNino.count({
+      where: { numero_factura },
+    });
+    if (usadasReales >= paquete.clases_pagadas) {
       return res
         .status(400)
         .json({ error: "Ya se usaron todas las clases de este paquete" });
     }
 
-    await paquete.update({ clases_usadas: paquete.clases_usadas + 1 });
+    // Sincronizar contador con conteo real
+    await paquete.update({ clases_usadas: usadasReales });
     res.json(paquete.toJSON());
   } catch (e) {
     res.status(500).json({ error: e.message });
