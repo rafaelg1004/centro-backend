@@ -19,14 +19,43 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Obtener todos los paquetes de un niño
+// Obtener todos los paquetes de un niño (con clases_usadas reales desde ClaseNino)
 router.get("/por-nino/:paciente_id", async (req, res) => {
   try {
     const paquetes = await PagoPaquete.findAll({
       where: { paciente_id: req.params.paciente_id },
+      order: [["fecha_pago", "DESC"]],
     });
-    res.json(paquetes);
+
+    // Contar sesiones reales por numero_factura para este paciente
+    const clasesPorFactura = await ClaseNino.findAll({
+      attributes: ["numero_factura", [require("sequelize").fn("COUNT", require("sequelize").col("id")), "count"]],
+      where: {
+        paciente_id: req.params.paciente_id,
+        numero_factura: { [Op.ne]: null },
+      },
+      group: ["numero_factura"],
+      raw: true,
+    });
+
+    const countMap = {};
+    clasesPorFactura.forEach((c) => {
+      countMap[c.numero_factura] = parseInt(c.count, 10);
+    });
+
+    const resultado = paquetes.map((p) => {
+      const realUsadas = countMap[p.numero_factura] || 0;
+      return {
+        ...p.toJSON(),
+        clases_usadas: realUsadas,
+        clases_disponibles: p.clases_pagadas - realUsadas,
+        estado: realUsadas >= p.clases_pagadas ? "Agotado" : "Activo",
+      };
+    });
+
+    res.json(resultado);
   } catch (e) {
+    console.error("Error al obtener paquetes por niño:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -81,9 +110,10 @@ router.get("/reporte", async (req, res) => {
           include: [{ model: Clase, as: "clase" }],
         });
 
-        const clasesDisponibles = paquete.clases_pagadas - paquete.clases_usadas;
+        const realClasesUsadas = clasesConPaquete.length;
+        const clasesDisponibles = paquete.clases_pagadas - realClasesUsadas;
         const porcentajeUso = paquete.clases_pagadas > 0
-          ? Math.round((paquete.clases_usadas / paquete.clases_pagadas) * 100)
+          ? Math.round((realClasesUsadas / paquete.clases_pagadas) * 100)
           : 0;
 
         return {
@@ -99,14 +129,14 @@ router.get("/reporte", async (req, res) => {
           },
           numero_factura: paquete.numero_factura,
           clases_pagadas: paquete.clases_pagadas,
-          clases_usadas: paquete.clases_usadas,
+          clases_usadas: realClasesUsadas,
           clases_disponibles: clasesDisponibles,
           clasesDisponibles: clasesDisponibles,
           porcentaje_uso: porcentajeUso,
           porcentajeUso: porcentajeUso,
           fecha_pago: paquete.fecha_pago,
           estado:
-            paquete.clases_usadas >= paquete.clases_pagadas
+            realClasesUsadas >= paquete.clases_pagadas
               ? "Agotado"
               : "Activo",
           clases_con_paquete: clasesConPaquete.map((cn) => ({
@@ -278,6 +308,52 @@ router.delete("/:id", async (req, res) => {
     await paquete.destroy();
     res.json({ mensaje: "Factura eliminada correctamente" });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Recalcular clases_usadas para todos los paquetes basado en ClaseNino real
+router.post("/recalcular", async (req, res) => {
+  try {
+    const paquetes = await PagoPaquete.findAll();
+
+    // Contar todas las sesiones reales por numero_factura
+    const clasesPorFactura = await ClaseNino.findAll({
+      attributes: [
+        "numero_factura",
+        [require("sequelize").fn("COUNT", require("sequelize").col("id")), "count"],
+      ],
+      where: { numero_factura: { [Op.ne]: null } },
+      group: ["numero_factura"],
+      raw: true,
+    });
+
+    const countMap = {};
+    clasesPorFactura.forEach((c) => {
+      countMap[c.numero_factura] = parseInt(c.count, 10);
+    });
+
+    const actualizaciones = [];
+    for (const paquete of paquetes) {
+      const realUsadas = countMap[paquete.numero_factura] || 0;
+      if (paquete.clases_usadas !== realUsadas) {
+        await paquete.update({ clases_usadas: realUsadas });
+        actualizaciones.push({
+          id: paquete.id,
+          numero_factura: paquete.numero_factura,
+          anterior: paquete.clases_usadas,
+          nuevo: realUsadas,
+        });
+      }
+    }
+
+    res.json({
+      mensaje: `Recálculo completado. ${actualizaciones.length} paquete(s) actualizado(s).`,
+      actualizaciones,
+      totalPaquetes: paquetes.length,
+    });
+  } catch (e) {
+    console.error("Error al recalcular paquetes:", e);
     res.status(500).json({ error: e.message });
   }
 });
