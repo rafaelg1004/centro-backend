@@ -92,76 +92,99 @@ router.get("/reporte", async (req, res) => {
     });
 
     const paquetesFiltrados = paquetes.filter((paquete) => paquete.paciente);
+    if (paquetesFiltrados.length === 0) {
+      return res.json([]);
+    }
 
-    const reporte = await Promise.all(
-      paquetesFiltrados.map(async (paquete) => {
-        // Buscar clases donde se está usando este paquete (usando ClaseNino)
-        const clasesConPaquete = await ClaseNino.findAll({
-          where: { numero_factura: paquete.numero_factura },
-          include: [{ model: Clase, as: "clase" }],
-        });
+    // Obtener todos los pacientes IDs y facturas para batch queries
+    const pacienteIds = [...new Set(paquetesFiltrados.map((p) => p.paciente.id))];
+    const facturas = [...new Set(paquetesFiltrados.map((p) => p.numero_factura))];
 
-        // Buscar clases donde está el paciente pero sin paquete
-        const clasesSinPaquete = await ClaseNino.findAll({
-          where: {
-            paciente_id: paquete.paciente.id,
-            numero_factura: { [Op.or]: [null, ""] },
-          },
-          include: [{ model: Clase, as: "clase" }],
-        });
+    // Query única para todas las sesiones con paquete
+    const todasClasesConPaquete = await ClaseNino.findAll({
+      where: { numero_factura: { [Op.in]: facturas } },
+      include: [{ model: Clase, as: "clase" }],
+    });
 
-        const realClasesUsadas = clasesConPaquete.length;
-        const clasesDisponibles = paquete.clases_pagadas - realClasesUsadas;
-        const porcentajeUso = paquete.clases_pagadas > 0
-          ? Math.round((realClasesUsadas / paquete.clases_pagadas) * 100)
-          : 0;
+    // Query única para todas las sesiones sin paquete de estos pacientes
+    const todasClasesSinPaquete = await ClaseNino.findAll({
+      where: {
+        paciente_id: { [Op.in]: pacienteIds },
+        numero_factura: { [Op.or]: [null, ""] },
+      },
+      include: [{ model: Clase, as: "clase" }],
+    });
 
-        return {
-          id: paquete.id,
-          paciente: {
-            id: paquete.paciente.id,
-            nombres: paquete.paciente.nombres,
-            apellidos: paquete.paciente.apellidos,
-            num_documento_identificacion: paquete.paciente.num_documento_identificacion,
-            cod_sexo: paquete.paciente.cod_sexo,
-            fecha_nacimiento: paquete.paciente.fecha_nacimiento,
-            datos_contacto: paquete.paciente.datos_contacto,
-          },
-          numero_factura: paquete.numero_factura,
-          clases_pagadas: paquete.clases_pagadas,
-          clases_usadas: realClasesUsadas,
-          clases_disponibles: clasesDisponibles,
-          clasesDisponibles: clasesDisponibles,
-          porcentaje_uso: porcentajeUso,
-          porcentajeUso: porcentajeUso,
-          fecha_pago: paquete.fecha_pago,
-          estado:
-            realClasesUsadas >= paquete.clases_pagadas
-              ? "Agotado"
-              : "Activo",
-          clases_con_paquete: clasesConPaquete.map((cn) => ({
-            id: cn.clase?.id,
-            nombre: cn.clase?.nombre,
-            fecha: cn.clase?.fecha,
-          })),
-          clasesConPaquete: clasesConPaquete.map((cn) => ({
-            id: cn.clase?.id,
-            nombre: cn.clase?.nombre,
-            fecha: cn.clase?.fecha,
-          })),
-          clases_sin_paquete: clasesSinPaquete.map((cn) => ({
-            id: cn.clase?.id,
-            nombre: cn.clase?.nombre,
-            fecha: cn.clase?.fecha,
-          })),
-          clasesSinPaquete: clasesSinPaquete.map((cn) => ({
-            id: cn.clase?.id,
-            nombre: cn.clase?.nombre,
-            fecha: cn.clase?.fecha,
-          })),
-        };
-      }),
-    );
+    // Indexar por factura y por paciente_id para acceso O(1)
+    const clasesConPorFactura = {};
+    todasClasesConPaquete.forEach((cn) => {
+      const nf = cn.numero_factura;
+      if (!clasesConPorFactura[nf]) clasesConPorFactura[nf] = [];
+      clasesConPorFactura[nf].push(cn);
+    });
+
+    const clasesSinPorPaciente = {};
+    todasClasesSinPaquete.forEach((cn) => {
+      const pid = cn.paciente_id;
+      if (!clasesSinPorPaciente[pid]) clasesSinPorPaciente[pid] = [];
+      clasesSinPorPaciente[pid].push(cn);
+    });
+
+    const reporte = paquetesFiltrados.map((paquete) => {
+      const clasesConPaquete = clasesConPorFactura[paquete.numero_factura] || [];
+      const clasesSinPaquete = clasesSinPorPaciente[paquete.paciente.id] || [];
+
+      const realClasesUsadas = clasesConPaquete.length;
+      const clasesDisponibles = paquete.clases_pagadas - realClasesUsadas;
+      const porcentajeUso = paquete.clases_pagadas > 0
+        ? Math.round((realClasesUsadas / paquete.clases_pagadas) * 100)
+        : 0;
+
+      return {
+        id: paquete.id,
+        paciente: {
+          id: paquete.paciente.id,
+          nombres: paquete.paciente.nombres,
+          apellidos: paquete.paciente.apellidos,
+          num_documento_identificacion: paquete.paciente.num_documento_identificacion,
+          cod_sexo: paquete.paciente.cod_sexo,
+          fecha_nacimiento: paquete.paciente.fecha_nacimiento,
+          datos_contacto: paquete.paciente.datos_contacto,
+        },
+        numero_factura: paquete.numero_factura,
+        clases_pagadas: paquete.clases_pagadas,
+        clases_usadas: realClasesUsadas,
+        clases_disponibles: clasesDisponibles,
+        clasesDisponibles: clasesDisponibles,
+        porcentaje_uso: porcentajeUso,
+        porcentajeUso: porcentajeUso,
+        fecha_pago: paquete.fecha_pago,
+        estado:
+          realClasesUsadas >= paquete.clases_pagadas
+            ? "Agotado"
+            : "Activo",
+        clases_con_paquete: clasesConPaquete.map((cn) => ({
+          id: cn.clase?.id,
+          nombre: cn.clase?.nombre,
+          fecha: cn.clase?.fecha,
+        })),
+        clasesConPaquete: clasesConPaquete.map((cn) => ({
+          id: cn.clase?.id,
+          nombre: cn.clase?.nombre,
+          fecha: cn.clase?.fecha,
+        })),
+        clases_sin_paquete: clasesSinPaquete.map((cn) => ({
+          id: cn.clase?.id,
+          nombre: cn.clase?.nombre,
+          fecha: cn.clase?.fecha,
+        })),
+        clasesSinPaquete: clasesSinPaquete.map((cn) => ({
+          id: cn.clase?.id,
+          nombre: cn.clase?.nombre,
+          fecha: cn.clase?.fecha,
+        })),
+      };
+    });
 
     res.json(reporte);
   } catch (e) {
