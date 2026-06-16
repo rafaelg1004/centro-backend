@@ -42,7 +42,7 @@ router.post("/:id/agregar-nino", async (req, res) => {
           return res.status(404).json({ error: "Factura no encontrada" });
 
         // Validar que el paquete pertenezca al paciente
-        if (paquete.paciente_id !== paciente_id) {
+        if (String(paquete.paciente_id) !== String(paciente_id)) {
           return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
         }
 
@@ -131,7 +131,7 @@ router.post("/:id/asignar-paquete", async (req, res) => {
       return res.status(404).json({ error: "Factura no encontrada" });
 
     // Validar que el paquete pertenezca al paciente
-    if (paquete.paciente_id !== paciente_id) {
+    if (String(paquete.paciente_id) !== String(paciente_id)) {
       return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
     }
 

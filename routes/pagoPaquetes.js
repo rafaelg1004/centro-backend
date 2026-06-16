@@ -28,7 +28,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const nuevo = await PagoPaquete.create(req.body);
+    const dataToSave = { ...req.body, numero_factura: numero_factura.trim() };
+    const nuevo = await PagoPaquete.create(dataToSave);
     res.status(201).json(nuevo);
   } catch (e) {
     console.error("Error al crear paquete:", e);
