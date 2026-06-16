@@ -45,7 +45,7 @@ router.post("/:id/agregar-nino", async (req, res) => {
         if (String(paquete.paciente_id) !== String(paciente_id)) {
           return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
         }
-
+        
         // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
         const usadasReales = await ClaseNino.count({
           where: { numero_factura },
@@ -134,7 +134,7 @@ router.post("/:id/asignar-paquete", async (req, res) => {
     if (String(paquete.paciente_id) !== String(paciente_id)) {
       return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
     }
-
+    
     // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
     const usadasReales = await ClaseNino.count({
       where: { numero_factura },
