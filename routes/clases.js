@@ -41,6 +41,11 @@ router.post("/:id/agregar-nino", async (req, res) => {
         if (!paquete)
           return res.status(404).json({ error: "Factura no encontrada" });
 
+        // Validar que el paquete pertenezca al paciente
+        if (paquete.paciente_id !== paciente_id) {
+          return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
+        }
+
         // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
         const usadasReales = await ClaseNino.count({
           where: { numero_factura },
@@ -124,6 +129,11 @@ router.post("/:id/asignar-paquete", async (req, res) => {
     });
     if (!paquete)
       return res.status(404).json({ error: "Factura no encontrada" });
+
+    // Validar que el paquete pertenezca al paciente
+    if (paquete.paciente_id !== paciente_id) {
+      return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
+    }
 
     // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
     const usadasReales = await ClaseNino.count({
@@ -231,6 +241,12 @@ router.get("/", async (req, res) => {
     const total = await Clase.count({ where: whereClause });
     const clases = await Clase.findAll({
       where: whereClause,
+      include: [
+        {
+          model: ClaseNino,
+          as: "ninos",
+        },
+      ],
       order: [
         ["fecha", "DESC"],
         ["id", "DESC"],
