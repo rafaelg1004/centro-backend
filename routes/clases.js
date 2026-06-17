@@ -5,6 +5,7 @@ const {
   ClaseNino,
   PagoPaquete,
   Paciente,
+  sequelize,
 } = require("../models-sequelize");
 const { Op } = require("sequelize");
 
@@ -22,35 +23,48 @@ router.post("/", async (req, res) => {
 
 // Agregar niño a clase (evita duplicados y estructura para firma)
 router.post("/:id/agregar-nino", async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { paciente_id, firma, numero_factura } = req.body;
-    const clase = await Clase.findByPk(req.params.id);
-    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
+    const clase = await Clase.findByPk(req.params.id, { transaction });
+    if (!clase) {
+      await transaction.rollback();
+      return res.status(404).json({ error: "Clase no encontrada" });
+    }
 
     // Evita duplicados
     const existeNino = await ClaseNino.findOne({
       where: { clase_id: req.params.id, paciente_id },
+      transaction
     });
 
     if (!existeNino) {
       // Si hay numero_factura, validar y descontar clase
       if (numero_factura) {
+        // LOCK.UPDATE previene condiciones de carrera si dos peticiones simultáneas intentan usar el mismo paquete
         const paquete = await PagoPaquete.findOne({
           where: { numero_factura },
+          transaction,
+          lock: transaction.LOCK.UPDATE
         });
-        if (!paquete)
+        if (!paquete) {
+          await transaction.rollback();
           return res.status(404).json({ error: "Factura no encontrada" });
+        }
 
         // Validar que el paquete pertenezca al paciente
         if (String(paquete.paciente_id) !== String(paciente_id)) {
+          await transaction.rollback();
           return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
         }
         
         // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
         const usadasReales = await ClaseNino.count({
           where: { numero_factura },
+          transaction
         });
         if (usadasReales >= paquete.clases_pagadas) {
+          await transaction.rollback();
           return res
             .status(400)
             .json({ error: "No quedan clases disponibles en este paquete" });
@@ -62,13 +76,14 @@ router.post("/:id/agregar-nino", async (req, res) => {
           paciente_id,
           numero_factura,
           firma,
-        });
+        }, { transaction });
 
         // Sincronizar contador con conteo real
         const nuevoConteo = await ClaseNino.count({
           where: { numero_factura },
+          transaction
         });
-        await paquete.update({ clases_usadas: nuevoConteo });
+        await paquete.update({ clases_usadas: nuevoConteo }, { transaction });
       } else {
         // Crear relación clase-niño sin factura
         await ClaseNino.create({
@@ -76,9 +91,11 @@ router.post("/:id/agregar-nino", async (req, res) => {
           paciente_id,
           numero_factura: null,
           firma,
-        });
+        }, { transaction });
       }
     }
+
+    await transaction.commit();
 
     // Retornar clase con niños actualizados
     const claseActualizada = await Clase.findByPk(req.params.id, {
@@ -104,20 +121,28 @@ router.post("/:id/agregar-nino", async (req, res) => {
 
 // Asignar paquete a un niño ya agregado a la clase
 router.post("/:id/asignar-paquete", async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { paciente_id, numero_factura } = req.body;
-    const clase = await Clase.findByPk(req.params.id);
-    if (!clase) return res.status(404).json({ error: "Clase no encontrada" });
+    const clase = await Clase.findByPk(req.params.id, { transaction });
+    if (!clase) {
+      await transaction.rollback();
+      return res.status(404).json({ error: "Clase no encontrada" });
+    }
 
     // Buscar el niño en la clase
     const ninoClase = await ClaseNino.findOne({
       where: { clase_id: req.params.id, paciente_id },
+      transaction
     });
-    if (!ninoClase)
+    if (!ninoClase) {
+      await transaction.rollback();
       return res.status(404).json({ error: "Niño no encontrado en la clase" });
+    }
 
     // Verificar que no tenga ya un paquete asignado
     if (ninoClase.numero_factura) {
+      await transaction.rollback();
       return res
         .status(400)
         .json({ error: "Este niño ya tiene un paquete asignado" });
@@ -126,33 +151,43 @@ router.post("/:id/asignar-paquete", async (req, res) => {
     // Validar el paquete
     const paquete = await PagoPaquete.findOne({
       where: { numero_factura },
+      transaction,
+      lock: transaction.LOCK.UPDATE
     });
-    if (!paquete)
+    if (!paquete) {
+      await transaction.rollback();
       return res.status(404).json({ error: "Factura no encontrada" });
+    }
 
     // Validar que el paquete pertenezca al paciente
     if (String(paquete.paciente_id) !== String(paciente_id)) {
+      await transaction.rollback();
       return res.status(400).json({ error: "El paquete seleccionado pertenece a otro paciente" });
     }
     
     // Validar contra conteo REAL de ClaseNino (no el contador desfasado)
     const usadasReales = await ClaseNino.count({
       where: { numero_factura },
+      transaction
     });
     if (usadasReales >= paquete.clases_pagadas) {
+      await transaction.rollback();
       return res
         .status(400)
         .json({ error: "No quedan clases disponibles en este paquete" });
     }
 
     // Asignar el paquete
-    await ninoClase.update({ numero_factura });
+    await ninoClase.update({ numero_factura }, { transaction });
 
     // Sincronizar contador con conteo real
     const nuevoConteo = await ClaseNino.count({
       where: { numero_factura },
+      transaction
     });
-    await paquete.update({ clases_usadas: nuevoConteo });
+    await paquete.update({ clases_usadas: nuevoConteo }, { transaction });
+
+    await transaction.commit();
 
     const claseActualizada = await Clase.findByPk(req.params.id, {
       include: [

@@ -5,6 +5,7 @@ const {
   Paciente,
   Clase,
   ClaseNino,
+  sequelize,
 } = require("../models-sequelize");
 const { Op } = require("sequelize");
 
@@ -212,30 +213,38 @@ router.get("/reporte", async (req, res) => {
 });
 
 router.post("/usar-clase", async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const { paciente_id, numero_factura } = req.body;
     const paquete = await PagoPaquete.findOne({
       where: { paciente_id, numero_factura },
+      transaction,
+      lock: transaction.LOCK.UPDATE
     });
 
     if (!paquete) {
+      await transaction.rollback();
       return res.status(404).json({ error: "Paquete no encontrado" });
     }
 
     // Validar contra conteo REAL de ClaseNino
     const usadasReales = await ClaseNino.count({
       where: { numero_factura },
+      transaction
     });
     if (usadasReales >= paquete.clases_pagadas) {
+      await transaction.rollback();
       return res
         .status(400)
         .json({ error: "Ya se usaron todas las clases de este paquete" });
     }
 
     // Sincronizar contador con conteo real
-    await paquete.update({ clases_usadas: usadasReales });
+    await paquete.update({ clases_usadas: usadasReales }, { transaction });
+    await transaction.commit();
     res.json(paquete.toJSON());
   } catch (e) {
+    if (transaction && !transaction.finished) await transaction.rollback();
     res.status(500).json({ error: e.message });
   }
 });
@@ -281,10 +290,15 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Paquete no encontrado" });
     }
 
+    // Verificar el número real de asistencias vinculadas a este paquete
+    const usadasReales = await ClaseNino.count({
+      where: { numero_factura: paquete.numero_factura }
+    });
+
     // Verificar que las clases pagadas no sean menores a las ya usadas
-    if (clases_pagadas < paquete.clases_usadas) {
+    if (clases_pagadas < usadasReales) {
       return res.status(400).json({
-        error: `No puedes establecer menos clases pagadas (${clases_pagadas}) que las ya usadas (${paquete.clases_usadas})`,
+        error: `No puedes establecer menos clases pagadas (${clases_pagadas}) que las asistencias ya registradas (${usadasReales})`,
       });
     }
 
