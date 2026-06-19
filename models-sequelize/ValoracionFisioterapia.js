@@ -133,6 +133,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSONB,
         defaultValue: {},
       },
+      datos_legacy: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
     },
     {
       tableName: "valoraciones_fisioterapia",
