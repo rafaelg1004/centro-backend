@@ -86,16 +86,16 @@ router.post("/", async (req, res) => {
       fecha_probable_parto: req.body.fechaProbableParto,
     };
 
-    // Mapear datos de contacto si vienen en formato plano (legacy)
-    if (!data.datosContacto) {
-      data.datosContacto = {
-        direccion: req.body.direccion,
-        telefono: req.body.telefono || req.body.celular,
-        nombreAcompanante:
-          req.body.acompanante || req.body.nombreMadre || req.body.nombrePadre,
-        telefonoAcompanante: req.body.telefonoAcompanante,
-      };
-    }
+    // Mapear datos de contacto si vienen en formato plano o anidado
+    const contactInfo = req.body.datos_contacto || req.body.datosContacto || {};
+    data.datos_contacto = {
+      direccion: req.body.direccion || contactInfo.direccion || null,
+      telefono: req.body.telefono || contactInfo.telefono || null,
+      celular: req.body.celular || contactInfo.celular || null,
+      nombreAcompanante: req.body.acompanante || contactInfo.nombreAcompanante || contactInfo.acompanante || req.body.nombreMadre || req.body.nombrePadre || null,
+      telefonoAcompanante: req.body.telefonoAcompanante || contactInfo.telefonoAcompanante || null,
+    };
+    data.datosContacto = data.datos_contacto; // Retrocompatibilidad en memoria
 
     // Mapear explícitamente los campos nuevos a snake_case
     data.tipo_documento_madre = req.body.tipoDocumentoMadre;
@@ -166,13 +166,18 @@ router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
         }
       }
 
+      const contactInfo = p.datos_contacto || {};
       return {
         ...p.toJSON(),
         registroCivil: p.num_documento_identificacion, // Alias legacy
         cedula: p.num_documento_identificacion, // Alias legacy
         genero: p.cod_sexo,
         edad: edad,
-        celular: "N/A", // TODO: agregar campo telefono al modelo
+        direccion: contactInfo.direccion || null,
+        telefono: contactInfo.telefono || null,
+        celular: contactInfo.celular || contactInfo.telefono || "N/A",
+        acompanante: contactInfo.nombreAcompanante || contactInfo.acompanante || p.nombre_madre || p.nombre_padre || "N/A",
+        telefonoAcompanante: contactInfo.telefonoAcompanante || null,
         nombreMadre: p.nombre_madre || "N/A",
         nombrePadre: p.nombre_padre || "N/A",
       };
@@ -239,13 +244,18 @@ router.get(
           }
         }
 
+        const contactInfo = p.datos_contacto || {};
         return {
           ...p.toJSON(),
           registroCivil: p.num_documento_identificacion,
           cedula: p.num_documento_identificacion,
           genero: p.cod_sexo,
           edad: edad,
-          celular: "N/A",
+          direccion: contactInfo.direccion || null,
+          telefono: contactInfo.telefono || null,
+          celular: contactInfo.celular || contactInfo.telefono || "N/A",
+          acompanante: contactInfo.nombreAcompanante || contactInfo.acompanante || p.nombre_madre || p.nombre_padre || "N/A",
+          telefonoAcompanante: contactInfo.telefonoAcompanante || null,
         };
       });
 
@@ -277,15 +287,18 @@ router.get(
       const paciente = await Paciente.findByPk(req.params.id);
       if (!paciente) return res.status(404).json({ error: "No encontrado" });
 
+      const contactInfo = paciente.datos_contacto || {};
       // Envolver en compatibilidad
       const data = {
         ...paciente.toJSON(),
         registroCivil: paciente.num_documento_identificacion,
         cedula: paciente.num_documento_identificacion,
         genero: paciente.cod_sexo,
-        direccion: null, // TODO: agregar campo direccion al modelo
-        telefono: null, // TODO: agregar campo telefono al modelo
-        acompanante: paciente.nombre_madre || paciente.nombre_padre,
+        direccion: contactInfo.direccion || null,
+        telefono: contactInfo.telefono || null,
+        celular: contactInfo.celular || contactInfo.telefono || null,
+        acompanante: contactInfo.nombreAcompanante || contactInfo.acompanante || paciente.nombre_madre || paciente.nombre_padre || null,
+        telefonoAcompanante: contactInfo.telefonoAcompanante || null,
       };
 
       res.json(data);
@@ -321,13 +334,78 @@ router.put(
         return res.status(404).json({ mensaje: "Paciente no encontrado" });
       }
 
-      // Al actualizar, tambiÃ©n manejamos la estructura anidada si el frontend manda datos planos
+      // Al actualizar, también manejamos la estructura anidada si el frontend manda datos planos
       const updateData = { ...req.body };
 
       if (req.body.esAdulto !== undefined) {
-        updateData.es_adulto =
-          req.body.esAdulto === true || req.body.esAdulto === "true";
+        updateData.es_adulto = req.body.esAdulto === true || req.body.esAdulto === "true";
       }
+      if (req.body.numDocumentoIdentificacion !== undefined) {
+        updateData.num_documento_identificacion = req.body.numDocumentoIdentificacion;
+      }
+      if (req.body.tipoDocumentoIdentificacion !== undefined) {
+        updateData.tipo_documento_identificacion = req.body.tipoDocumentoIdentificacion;
+      }
+      if (req.body.fechaNacimiento !== undefined) {
+        updateData.fecha_nacimiento = req.body.fechaNacimiento;
+      }
+      if (req.body.codSexo !== undefined) {
+        updateData.cod_sexo = req.body.codSexo;
+      }
+      if (req.body.lugarNacimiento !== undefined) {
+        updateData.lugar_nacimiento = req.body.lugarNacimiento;
+      }
+      if (req.body.estadoCivil !== undefined) {
+        updateData.estado_civil = req.body.estadoCivil;
+      }
+      if (req.body.nivelEducativo !== undefined) {
+        updateData.nivel_educativo = req.body.nivelEducativo;
+      }
+      if (req.body.medicoTratante !== undefined) {
+        updateData.medico_tratante = req.body.medicoTratante;
+      }
+      if (req.body.estadoEmbarazo !== undefined) {
+        updateData.estado_embarazo = req.body.estadoEmbarazo;
+      }
+      if (req.body.nombreBebe !== undefined) {
+        updateData.nombre_bebe = req.body.nombreBebe;
+      }
+      if (req.body.semanasGestacion !== undefined) {
+        updateData.semanas_gestacion = req.body.semanasGestacion;
+      }
+      if (req.body.fechaProbableParto !== undefined) {
+        updateData.fecha_probable_parto = req.body.fechaProbableParto;
+      }
+
+      // Datos Pediátricos
+      if (req.body.tipoDocumentoMadre !== undefined) updateData.tipo_documento_madre = req.body.tipoDocumentoMadre;
+      if (req.body.numDocumentoMadre !== undefined) updateData.num_documento_madre = req.body.numDocumentoMadre;
+      if (req.body.tipoDocumentoPadre !== undefined) updateData.tipo_documento_padre = req.body.tipoDocumentoPadre;
+      if (req.body.numDocumentoPadre !== undefined) updateData.num_documento_padre = req.body.numDocumentoPadre;
+      if (req.body.nombreMadre !== undefined) updateData.nombre_madre = req.body.nombreMadre;
+      if (req.body.edadMadre !== undefined) updateData.edad_madre = req.body.edadMadre;
+      if (req.body.ocupacionMadre !== undefined) updateData.ocupacion_madre = req.body.ocupacionMadre;
+      if (req.body.nombrePadre !== undefined) updateData.nombre_padre = req.body.nombrePadre;
+      if (req.body.edadPadre !== undefined) updateData.edad_padre = req.body.edadPadre;
+      if (req.body.ocupacionPadre !== undefined) updateData.ocupacion_padre = req.body.ocupacionPadre;
+
+      // Mapear datos de contacto
+      const currentContact = paciente.datos_contacto || {};
+      const contactInfo = req.body.datos_contacto || req.body.datosContacto || {};
+      
+      const newDireccion = req.body.direccion !== undefined ? req.body.direccion : (contactInfo.direccion !== undefined ? contactInfo.direccion : currentContact.direccion);
+      const newTelefono = req.body.telefono !== undefined ? req.body.telefono : (contactInfo.telefono !== undefined ? contactInfo.telefono : currentContact.telefono);
+      const newCelular = req.body.celular !== undefined ? req.body.celular : (contactInfo.celular !== undefined ? contactInfo.celular : currentContact.celular);
+      const newAcompanante = req.body.acompanante !== undefined ? req.body.acompanante : (contactInfo.nombreAcompanante !== undefined ? contactInfo.nombreAcompanante : (contactInfo.acompanante !== undefined ? contactInfo.acompanante : currentContact.nombreAcompanante));
+      const newTelefonoAcompanante = req.body.telefonoAcompanante !== undefined ? req.body.telefonoAcompanante : (contactInfo.telefonoAcompanante !== undefined ? contactInfo.telefonoAcompanante : currentContact.telefonoAcompanante);
+
+      updateData.datos_contacto = {
+        direccion: newDireccion || "",
+        telefono: newTelefono || "",
+        celular: newCelular || "",
+        nombreAcompanante: newAcompanante || "",
+        telefonoAcompanante: newTelefonoAcompanante || "",
+      };
 
       await paciente.update(updateData);
       res.json({

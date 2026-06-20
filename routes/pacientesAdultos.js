@@ -152,15 +152,18 @@ router.get("/:id", async (req, res) => {
     const paciente = await Paciente.findByPk(req.params.id);
     if (!paciente) return res.status(404).json({ error: "No encontrado" });
 
+    const contactInfo = paciente.datos_contacto || {};
+
     // Devolver con alias de compatibilidad
     res.json({
       ...paciente.toJSON(),
       cedula: paciente.num_documento_identificacion,
       genero: paciente.cod_sexo,
-      direccion: null,
-      telefono: null,
-      acompanante: paciente.nombre_madre || paciente.nombre_padre,
-      telefonoAcompanante: null,
+      direccion: contactInfo.direccion || null,
+      telefono: contactInfo.telefono || null,
+      celular: contactInfo.celular || contactInfo.telefono || null,
+      acompanante: contactInfo.nombreAcompanante || contactInfo.acompanante || paciente.nombre_madre || paciente.nombre_padre || null,
+      telefonoAcompanante: contactInfo.telefonoAcompanante || null,
     });
   } catch (error) {
     res.status(500).json({ error: "Error al obtener paciente" });
@@ -177,6 +180,25 @@ router.put("/:id", async (req, res) => {
 
     const paciente = await Paciente.findByPk(req.params.id);
     if (!paciente) return res.status(404).json({ mensaje: "No encontrado" });
+
+    // Mapear datos de contacto
+    const currentContact = paciente.datos_contacto || {};
+    const contactInfo = req.body.datos_contacto || req.body.datosContacto || {};
+    
+    const newDireccion = req.body.direccion !== undefined ? req.body.direccion : (contactInfo.direccion !== undefined ? contactInfo.direccion : currentContact.direccion);
+    const newTelefono = req.body.telefono !== undefined ? req.body.telefono : (contactInfo.telefono !== undefined ? contactInfo.telefono : currentContact.telefono);
+    const newCelular = req.body.celular !== undefined ? req.body.celular : (contactInfo.celular !== undefined ? contactInfo.celular : currentContact.celular);
+    const newAcompanante = req.body.acompanante !== undefined ? req.body.acompanante : (contactInfo.nombreAcompanante !== undefined ? contactInfo.nombreAcompanante : (contactInfo.acompanante !== undefined ? contactInfo.acompanante : currentContact.nombreAcompanante));
+    const newTelefonoAcompanante = req.body.telefonoAcompanante !== undefined ? req.body.telefonoAcompanante : (contactInfo.telefonoAcompanante !== undefined ? contactInfo.telefonoAcompanante : currentContact.telefonoAcompanante);
+
+    updateData.datos_contacto = {
+      direccion: newDireccion || "",
+      telefono: newTelefono || "",
+      celular: newCelular || "",
+      nombreAcompanante: newAcompanante || "",
+      telefonoAcompanante: newTelefonoAcompanante || "",
+    };
+
     await paciente.update(updateData);
 
     res.json({
