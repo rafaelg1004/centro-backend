@@ -111,13 +111,46 @@ const EvolucionSesion = sequelize.define(
   { tableName: "evoluciones_sesion", timestamps: true, underscored: true },
 );
 
+const CIE10 = sequelize.define(
+  "CIE10",
+  {
+    id: { type: Sequelize.UUID, defaultValue: Sequelize.UUIDV4, primaryKey: true },
+    codigo: { type: Sequelize.STRING(20), allowNull: false, unique: true },
+    nombre: { type: Sequelize.STRING(500), allowNull: false },
+    descripcion: Sequelize.TEXT,
+    categoria: Sequelize.STRING(100),
+    sexo_restringido: Sequelize.STRING(1),
+    edad_minima: Sequelize.INTEGER,
+    edad_maxima: Sequelize.INTEGER,
+    activo: { type: Sequelize.BOOLEAN, defaultValue: true },
+  },
+  { tableName: "cie10s", timestamps: true, underscored: true },
+);
+
+async function obtenerDescripcionCIE10(codigo) {
+  const codigoLimpio = String(codigo || "").split(" ")[0].trim().toUpperCase();
+  if (!codigoLimpio) return null;
+  const row = await CIE10.findOne({
+    where: { codigo: codigoLimpio },
+    attributes: ["nombre", "descripcion"],
+  });
+  return row ? (row.nombre || row.descripcion) : null;
+}
+
+function formatearDiagnostico(codigo, descripcion) {
+  const codigoLimpio = String(codigo || "").split(" ")[0].trim().toUpperCase();
+  const descLimpia = String(descripcion || "").trim();
+  if (!descLimpia) return codigoLimpio;
+  return `${codigoLimpio} - ${descLimpia}`;
+}
+
 async function main() {
   try {
     await sequelize.authenticate();
     console.log("✅ Conectado a PostgreSQL");
 
     let whereClause = {
-      cod_consulta: { [Op.iLike]: "890204%" },
+      cod_consulta: { [Op.iLike]: "890264%" },
     };
 
     if (targetId) {
@@ -168,16 +201,20 @@ async function main() {
     console.log("\n🛠️ Aplicando correcciones...\n");
 
     for (const v of aReparar) {
-      const codConsulta = v.cod_consulta || `890204 - CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA`;
+      const codConsulta = v.cod_consulta || `890264 - CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FISICA Y REHABILITACION`;
+      const codDiagnosticoLimpio = String(diagnosticoDefault || "").split(" ")[0].trim().toUpperCase();
+      const descripcionCIE10 = await obtenerDescripcionCIE10(codDiagnosticoLimpio);
+      const diagnosticoConDescripcion = formatearDiagnostico(codDiagnosticoLimpio, descripcionCIE10);
 
       await v.update({
         cod_consulta: codConsulta,
         finalidad_tecnologia_salud: finalidadDefault,
         causa_motivo_atencion: causaDefault,
-        cod_diagnostico_principal: diagnosticoDefault,
+        cod_diagnostico_principal: diagnosticoConDescripcion,
       });
 
       console.log(`✅ Valoración ${v.id} reparada.`);
+      console.log(`   Diagnóstico: ${diagnosticoConDescripcion}`);
 
       // Propagar corrección a las sesiones/evoluciones asociadas
       const sesiones = await EvolucionSesion.findAll({ where: { valoracion_id: v.id } });
@@ -186,7 +223,7 @@ async function main() {
           await s.update({
             cod_procedimiento: "890204",
             finalidad_tecnologia_salud: finalidadDefault,
-            cod_diagnostico_principal: diagnosticoDefault,
+            cod_diagnostico_principal: diagnosticoConDescripcion,
           });
         }
         console.log(`   └─ ${sesiones.length} sesión(es) asociada(s) actualizada(s).`);

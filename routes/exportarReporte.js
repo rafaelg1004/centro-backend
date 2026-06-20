@@ -44,7 +44,7 @@ router.get("/exportar-pdf/:id", async (req, res) => {
       if (modPediatria.desarrollo_motor) reportType = "nino";
       else if (modPisoPelvico.icicq_frecuencia) reportType = "adulto";
       else if (modLactancia.experiencia_lactancia) reportType = "lactancia";
-      else if (valoracion.cod_consulta === "890204") reportType = "perinatal";
+      else if (valoracion.cod_consulta === "890264") reportType = "perinatal";
       else reportType = "nino";
     }
 

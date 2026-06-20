@@ -7,7 +7,7 @@ const cupsData = [
     // CONSULTAS
     {
         codigo: '890264',
-        nombre: 'CONSULTA DE PRIMERA VEZ POR FISIOTERAPIA',
+        nombre: 'CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FISICA Y REHABILITACION',
         tipoServicio: 'consulta',
         categoria: 'fisioterapia',
         valor: 90000,

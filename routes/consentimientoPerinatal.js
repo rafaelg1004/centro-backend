@@ -12,7 +12,7 @@ const { eliminarImagenesValoracion } = require("../utils/s3Utils");
 const { verificarBloqueo } = require("../utils/hcMiddleware");
 const logger = require("../utils/logger");
 
-const CUPS_PERINATAL = "890204"; // Código CUPS para evaluación perinatal/prenatal
+const CUPS_PERINATAL = "890264"; // Código CUPS para evaluación perinatal/prenatal
 
 const bloquearBase64 = (req, res, next) => {
   const camposImagen = [
