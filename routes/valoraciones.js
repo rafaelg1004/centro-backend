@@ -631,29 +631,7 @@ router.get(
       console.log("[DEBUG] Valoracion paciente_id:", obj.paciente_id);
       if (obj.paciente_id) {
         try {
-          const paciente = await Paciente.findByPk(obj.paciente_id, {
-            attributes: [
-              "id",
-              "nombres",
-              "apellidos",
-              "tipo_documento_identificacion",
-              "num_documento_identificacion",
-              "fecha_nacimiento",
-              "cod_sexo",
-              "aseguradora",
-              "pediatra",
-              "peso",
-              "talla",
-              "nombre_madre",
-              "edad_madre",
-              "ocupacion_madre",
-              "nombre_padre",
-              "edad_padre",
-              "ocupacion_padre",
-              "datos_contacto",
-              "es_adulto",
-            ],
-          });
+          const paciente = await Paciente.findByPk(obj.paciente_id);
           console.log("[DEBUG] Paciente encontrado:", paciente ? "SÍ" : "NO");
           if (paciente) {
             const pacienteData = paciente.toJSON();
