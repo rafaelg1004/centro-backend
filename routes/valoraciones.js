@@ -137,17 +137,22 @@ const generarSesionesPerinatales = (planRaw) => {
   return { sesiones, sesionesIntensivo };
 };
 
-const crearSesionesEnCascada = async (valId, pacienteId, plan) => {
+const crearSesionesEnCascada = async (valId, pacienteId, plan, valoracionPadre = {}) => {
   const { sesiones, sesionesIntensivo } = generarSesionesPerinatales(plan);
   const todas = [...sesiones, ...sesionesIntensivo];
+
+  // Heredar RIPS de la valoración padre si están disponibles; si no, usar valores seguros por defecto
+  const codProcedimiento = valoracionPadre.cod_consulta || valoracionPadre.codConsulta || "890204";
+  const finalidad = valoracionPadre.finalidad_tecnologia_salud || valoracionPadre.finalidadTecnologiaSalud || "44";
+  const diagnostico = valoracionPadre.cod_diagnostico_principal || valoracionPadre.codDiagnosticoPrincipal || "Z348";
 
   const docs = todas.map((s, idx) => ({
     valoracionAsociada: valId,
     paciente: pacienteId,
     fechaInicioAtencion: new Date(), // Se inicializa con la fecha actual (requerido por RIPS)
-    codProcedimiento: "890204",
-    finalidadTecnologiaSalud: "44",
-    codDiagnosticoPrincipal: "Z348", // Generico embarazo
+    codProcedimiento,
+    finalidadTecnologiaSalud: finalidad,
+    codDiagnosticoPrincipal: diagnostico,
     numeroSesion: idx + 1,
     descripcionEvolucion: s.nombre,
     firmas: {
@@ -174,6 +179,7 @@ const mapValoracionData = (body) => {
   if (body.paciente) mapped.paciente_id = body.paciente;
   if (body.tipoPrograma !== undefined) mapped.tipo_programa = body.tipoPrograma;
   if (body.fechaInicioAtencion !== undefined) mapped.fecha_inicio_atencion = body.fechaInicioAtencion;
+  if (body.fecha_inicio_atencion !== undefined) mapped.fecha_inicio_atencion = body.fecha_inicio_atencion;
   if (body.numAutorizacion !== undefined) mapped.num_autorizacion = body.numAutorizacion;
   if (body.codConsulta !== undefined) mapped.cod_consulta = body.codConsulta;
   if (body.modalidadGrupoServicioTecSal !== undefined) mapped.modalidad_grupo_servicio_tec_sal = body.modalidadGrupoServicioTecSal;
@@ -181,6 +187,7 @@ const mapValoracionData = (body) => {
   if (body.finalidadTecnologiaSalud !== undefined) mapped.finalidad_tecnologia_salud = body.finalidadTecnologiaSalud;
   if (body.causaMotivoAtencion !== undefined) mapped.causa_motivo_atencion = body.causaMotivoAtencion;
   if (body.codDiagnosticoPrincipal !== undefined) mapped.cod_diagnostico_principal = body.codDiagnosticoPrincipal;
+  if (body.cod_diagnostico_principal !== undefined) mapped.cod_diagnostico_principal = body.cod_diagnostico_principal;
   if (body.tipoDiagnosticoPrincipal !== undefined) mapped.tipo_diagnostico_principal = body.tipoDiagnosticoPrincipal;
   if (body.vrServicio !== undefined) mapped.vr_servicio = body.vrServicio;
   if (body.conceptoRecaudo !== undefined) mapped.concepto_recaudo = body.conceptoRecaudo;
@@ -269,6 +276,7 @@ router.post("/", validarImagenes, async (req, res) => {
           valoracionGuardada.id,
           valoracionGuardada.paciente,
           planParaSesiones,
+          valoracionGuardada.toJSON ? valoracionGuardada.toJSON() : valoracionGuardada,
         );
       } catch (errSes) {
         console.error("❌ Error creando sesiones en cascada:", errSes);
@@ -550,10 +558,12 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         let ruta = "/valoraciones/";
 
         // Priorizar cod_consulta sobre tipoPrograma para mayor precisión
-        if (v.cod_consulta === "890204") tipo = "Perinatal";
-        else if (v.cod_consulta === "890202") tipo = "Piso Pélvico";
-        else if (v.cod_consulta === "890201") tipo = "Pediatría";
-        else if (v.cod_consulta === "890203") tipo = "Lactancia";
+        // Nota: cod_consulta puede incluir descripción (ej. "890204 - CONSULTA..."), usar startsWith
+        const codConsultaV = String(v.cod_consulta || '').split(' ')[0].trim();
+        if (codConsultaV === "890204") tipo = "Perinatal";
+        else if (codConsultaV === "890202") tipo = "Piso Pélvico";
+        else if (codConsultaV === "890201") tipo = "Pediatría";
+        else if (codConsultaV === "890203") tipo = "Lactancia";
         else if (v.tipoPrograma) {
           // Usar tipoPrograma solo si cod_consulta no está definido
           if (v.tipoPrograma.includes("Lactancia")) tipo = "Lactancia";
@@ -577,7 +587,7 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         }
 
         let sesionesIndependientes = [];
-        if (v.cod_consulta === "890204") {
+        if (codConsultaV === "890204") {
           const rawSesiones = await EvolucionSesion.findAll({
             where: { valoracion_id: v.id },
           });
@@ -653,7 +663,8 @@ router.get(
       }
 
       // Inyectar sesiones si es perinatal
-      if (obj.cod_consulta === "890204") {
+      const codConsultaObj = String(obj.cod_consulta || '').split(' ')[0].trim();
+      if (codConsultaObj === "890204") {
         const rawSesiones = await EvolucionSesion.findAll({
           where: { valoracion_id: obj.id },
         });
@@ -785,10 +796,15 @@ router.put(
 
       if (planDiferido) {
         try {
+          const padreActualizado = {
+            ...(valoracionActual.toJSON ? valoracionActual.toJSON() : valoracionActual),
+            ...req.body,
+          };
           await crearSesionesEnCascada(
             valoracionActual.id,
             valoracionActual.paciente_id,
             planDiferido,
+            padreActualizado,
           );
         } catch (errSes) {
           console.error(
