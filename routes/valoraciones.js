@@ -776,7 +776,7 @@ router.put(
 
         // Consultar si ya existen sesiones (Evoluciones) para esta valoración
         const countSesiones = await EvolucionSesion.count({
-          where: { valoracion_asociada_id: req.params.id },
+          where: { valoracion_id: req.params.id },
         });
         const sinSesiones = countSesiones === 0;
 
