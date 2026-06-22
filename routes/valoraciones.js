@@ -11,29 +11,6 @@ const logger = require("../utils/logger");
 const { verificarBloqueo } = require("../utils/hcMiddleware");
 
 // Middleware para logging de acceso a valoraciones
-const { Pool } = require('pg');
-const pool = new Pool({
-  host: process.env.PGHOST,
-  port: process.env.PGPORT,
-  database: process.env.PGDATABASE,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-});
-
-async function guardarRespaldo(req, endpoint) {
-  try {
-    const query = `
-      INSERT INTO respaldo_formularios (endpoint, metodo, payload_recibido)
-      VALUES ($1, $2, $3)
-    `;
-    const payload = JSON.stringify(req.body);
-    // Execute asynchronously without awaiting to prevent blocking the main request
-    pool.query(query, [endpoint, req.method, payload]).catch(e => console.error("Error guardando respaldo:", e));
-  } catch (err) {
-    console.error("Error preparando respaldo:", err);
-  }
-}
-
 const logAccesoValoracionMiddleware = (accion) => {
   return (req, res, next) => {
     const usuario =
@@ -236,7 +213,6 @@ const mapValoracionData = (body) => {
  * @desc    Crear una nueva valoraciÃ³n unificada (PediatrÃ­a, Piso PÃ©lvico o Lactancia)
  */
 router.post("/", validarImagenes, async (req, res) => {
-  guardarRespaldo(req, "/api/valoraciones");
   try {
     console.log(
       "📬 RECIBIDA PETICIÓN POST /valoraciones:",
@@ -748,7 +724,6 @@ router.put(
   verificarBloqueo(ValoracionFisioterapia, "ValoraciÃ³n"),
   validarImagenes,
   async (req, res) => {
-    guardarRespaldo(req, `/api/valoraciones/${req.params.id}`);
     try {
       const valoracionActual = await ValoracionFisioterapia.findByPk(
         req.params.id,
