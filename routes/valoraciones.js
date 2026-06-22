@@ -220,6 +220,18 @@ router.post("/", validarImagenes, async (req, res) => {
     );
     const { paciente, codConsulta } = req.body;
 
+    // Guardar payload crudo como backup para auditoría
+    try {
+      await sequelize.query(
+        `INSERT INTO raw_inputs_backups (endpoint, method, paciente_id, payload) VALUES ($1, $2, $3, $4)`,
+        {
+          bind: ['/valoraciones', 'POST', paciente || null, req.body]
+        }
+      );
+    } catch (auditErr) {
+      console.error("[AUDIT] Error guardando raw_inputs_backups:", auditErr);
+    }
+
     if (!paciente) {
       return res.status(400).json({
         error: "PACIENTE_REQUERIDO",
@@ -730,6 +742,18 @@ router.put(
       );
       if (!valoracionActual)
         return res.status(404).json({ mensaje: "No encontrada" });
+
+      // Guardar payload crudo como backup para auditoría
+      try {
+        await sequelize.query(
+          `INSERT INTO raw_inputs_backups (endpoint, method, paciente_id, valoracion_id, payload) VALUES ($1, $2, $3, $4, $5)`,
+          {
+            bind: [`/valoraciones/${req.params.id}`, 'PUT', valoracionActual.paciente_id || null, req.params.id, req.body]
+          }
+        );
+      } catch (auditErr) {
+        console.error("[AUDIT] Error guardando raw_inputs_backups:", auditErr);
+      }
 
       const {
         generarHash,
