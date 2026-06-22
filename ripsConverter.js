@@ -152,12 +152,12 @@ class RIPSConverter {
 
         // Solo agregar si el usuario existe Y tiene al menos un servicio
         const tieneServicios = servicios.consultas?.length > 0 ||
-                              servicios.procedimientos?.length > 0 ||
-                              servicios.urgencias?.length > 0 ||
-                              servicios.hospitalizacion?.length > 0 ||
-                              servicios.recienNacidos?.length > 0 ||
-                              servicios.medicamentos?.length > 0 ||
-                              servicios.otrosServicios?.length > 0;
+          servicios.procedimientos?.length > 0 ||
+          servicios.urgencias?.length > 0 ||
+          servicios.hospitalizacion?.length > 0 ||
+          servicios.recienNacidos?.length > 0 ||
+          servicios.medicamentos?.length > 0 ||
+          servicios.otrosServicios?.length > 0;
 
         if (usuario && tieneServicios) {
           // Agregar servicios al usuario para que tenga la estructura requerida
@@ -485,7 +485,7 @@ class RIPSConverter {
    * Determina el tipo de consulta según motivo
    */
   determinarTipoConsulta(motivo) {
-    // Según instrucciones: Todas las valoraciones apuntan a Consulta Fisiatría 1ra Vez ('890264')
+    // Según instrucciones: Todas las valoraciones apuntan a Consulta Fisiatría 1ra Vez ('890211')
     // Las de control o seguimiento usarían '890384'
     return 'consultaFisiatriaPrimeraVez';
   }

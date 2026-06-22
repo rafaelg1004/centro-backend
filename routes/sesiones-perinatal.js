@@ -11,7 +11,7 @@ const {
 } = require("../models-sequelize");
 const { Op } = require("sequelize");
 
-const CUPS_PERINATAL = "890264";
+const CUPS_PERINATAL = "890211";
 
 // Obtener todas las sesiones de un paciente
 router.get("/paciente/:id", async (req, res) => {

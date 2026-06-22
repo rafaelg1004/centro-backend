@@ -6,7 +6,7 @@ const ripsConfig = require('../ripsConfig');
 const cupsData = [
     // CONSULTAS
     {
-        codigo: '890264',
+        codigo: '890211',
         nombre: 'CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FISICA Y REHABILITACION',
         tipoServicio: 'consulta',
         categoria: 'fisioterapia',
@@ -17,7 +17,7 @@ const cupsData = [
         modalidad: '09'
     },
     {
-        codigo: '890264-1',
+        codigo: '890211-1',
         nombre: 'VALORACIÓN DE PISO PÉLVICO - PRIMERA VEZ',
         tipoServicio: 'consulta',
         categoria: 'pisoPelvico',
@@ -28,7 +28,7 @@ const cupsData = [
         modalidad: '09'
     },
     {
-        codigo: '890264-2',
+        codigo: '890211-2',
         nombre: 'VALORACIÓN DE LACTANCIA - PRIMERA VEZ',
         tipoServicio: 'consulta',
         categoria: 'lactancia',

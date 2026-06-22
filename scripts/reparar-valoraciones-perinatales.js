@@ -150,7 +150,7 @@ async function main() {
     console.log("✅ Conectado a PostgreSQL");
 
     let whereClause = {
-      cod_consulta: { [Op.iLike]: "890264%" },
+      cod_consulta: { [Op.iLike]: "890211%" },
     };
 
     if (targetId) {
@@ -201,7 +201,7 @@ async function main() {
     console.log("\n🛠️ Aplicando correcciones...\n");
 
     for (const v of aReparar) {
-      const codConsulta = v.cod_consulta || `890264 - CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FISICA Y REHABILITACION`;
+      const codConsulta = v.cod_consulta || `890211 - CONSULTA DE PRIMERA VEZ POR ESPECIALISTA EN MEDICINA FISICA Y REHABILITACION`;
       const codDiagnosticoLimpio = String(diagnosticoDefault || "").split(" ")[0].trim().toUpperCase();
       const descripcionCIE10 = await obtenerDescripcionCIE10(codDiagnosticoLimpio);
       const diagnosticoConDescripcion = formatearDiagnostico(codDiagnosticoLimpio, descripcionCIE10);

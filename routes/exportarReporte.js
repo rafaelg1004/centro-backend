@@ -44,17 +44,17 @@ router.get("/exportar-pdf/:id", async (req, res) => {
       if (modPediatria.desarrollo_motor) reportType = "nino";
       else if (modPisoPelvico.icicq_frecuencia) reportType = "adulto";
       else if (modLactancia.experiencia_lactancia) reportType = "lactancia";
-      else if (valoracion.cod_consulta === "890264") reportType = "perinatal";
+      else if (valoracion.cod_consulta === "890211") reportType = "perinatal";
       else reportType = "nino";
     }
 
     const paciente = pacienteData
       ? pacienteData.toJSON()
       : {
-          nombres: valoracion.nombres || "Paciente Desconocido",
-          cedula: valoracion.num_documento_identificacion || "S/D",
-          genero: valoracion.cod_sexo || "N/A",
-        };
+        nombres: valoracion.nombres || "Paciente Desconocido",
+        cedula: valoracion.num_documento_identificacion || "S/D",
+        genero: valoracion.cod_sexo || "N/A",
+      };
 
     // Datos del profesional: se toman del usuario que CREÓ la valoración
     const creador = creadorData ? creadorData.toJSON() : null;

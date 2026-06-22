@@ -142,7 +142,7 @@ const crearSesionesEnCascada = async (valId, pacienteId, plan, valoracionPadre =
   const todas = [...sesiones, ...sesionesIntensivo];
 
   // Heredar RIPS de la valoración padre si están disponibles; si no, usar valores seguros por defecto
-  const codProcedimiento = valoracionPadre.cod_consulta || valoracionPadre.codConsulta || "890264";
+  const codProcedimiento = valoracionPadre.cod_consulta || valoracionPadre.codConsulta || "890211";
   const finalidad = valoracionPadre.finalidad_tecnologia_salud || valoracionPadre.finalidadTecnologiaSalud || "44";
   const diagnostico = valoracionPadre.cod_diagnostico_principal || valoracionPadre.codDiagnosticoPrincipal || "Z348";
 
@@ -175,7 +175,7 @@ const crearSesionesEnCascada = async (valId, pacienteId, plan, valoracionPadre =
 
 const mapValoracionData = (body) => {
   const mapped = { ...body }; // Keep original fields just in case
-  
+
   if (body.paciente) mapped.paciente_id = body.paciente;
   if (body.tipoPrograma !== undefined) mapped.tipo_programa = body.tipoPrograma;
   if (body.fechaInicioAtencion !== undefined) mapped.fecha_inicio_atencion = body.fechaInicioAtencion;
@@ -258,7 +258,7 @@ router.post("/", validarImagenes, async (req, res) => {
 
     // Autocreación de sesiones para Perinatal si tiene plan
     let planParaSesiones = null;
-    if (req.body.codConsulta === "890264") {
+    if (req.body.codConsulta === "890211") {
       const plan = req.body.moduloPerinatal?.planElegido;
 
       console.log("🔍 Validando creación de sesiones perinatales:", { plan });
@@ -349,7 +349,7 @@ router.get(
           whereClause.modulo_piso_pelvico = { [Op.ne]: null };
         if (modulo === "lactancia")
           whereClause.modulo_lactancia = { [Op.ne]: null };
-        if (modulo === "perinatal") whereClause.cod_consulta = "890264";
+        if (modulo === "perinatal") whereClause.cod_consulta = "890211";
       }
 
       if (fechaInicio || fechaFin) {
@@ -431,7 +431,7 @@ router.get(
               tipo = "Piso Pélvico";
             }
             // Fallback por cod_consulta (retrocompatibilidad)
-            else if (v.cod_consulta === "890264") {
+            else if (v.cod_consulta === "890211") {
               tipo = "Perinatal";
             } else if (v.cod_consulta === "890202") {
               tipo = "Piso Pélvico";
@@ -442,7 +442,7 @@ router.get(
 
           // Si es perinatal, adjuntar información de progreso de sesiones independientes
           let sesionesIndependientes = [];
-          if (v.cod_consulta === "890264") {
+          if (v.cod_consulta === "890211") {
             const rawSesiones = await EvolucionSesion.findAll({
               where: { valoracion_id: v.id },
               raw: true,
@@ -570,9 +570,9 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         let ruta = "/valoraciones/";
 
         // Priorizar cod_consulta sobre tipoPrograma para mayor precisión
-        // Nota: cod_consulta puede incluir descripción (ej. "890264 - CONSULTA..."), usar startsWith
+        // Nota: cod_consulta puede incluir descripción (ej. "890211 - CONSULTA..."), usar startsWith
         const codConsultaV = String(v.cod_consulta || '').split(' ')[0].trim();
-        if (codConsultaV === "890264") tipo = "Perinatal";
+        if (codConsultaV === "890211") tipo = "Perinatal";
         else if (codConsultaV === "890202") tipo = "Piso Pélvico";
         else if (codConsultaV === "890201") tipo = "Pediatría";
         else if (codConsultaV === "890203") tipo = "Lactancia";
@@ -599,7 +599,7 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         }
 
         let sesionesIndependientes = [];
-        if (codConsultaV === "890264") {
+        if (codConsultaV === "890211") {
           const rawSesiones = await EvolucionSesion.findAll({
             where: { valoracion_id: v.id },
           });
@@ -676,7 +676,7 @@ router.get(
 
       // Inyectar sesiones si es perinatal
       const codConsultaObj = String(obj.cod_consulta || '').split(' ')[0].trim();
-      if (codConsultaObj === "890264") {
+      if (codConsultaObj === "890211") {
         const rawSesiones = await EvolucionSesion.findAll({
           where: { valoracion_id: obj.id },
         });
@@ -769,7 +769,7 @@ router.put(
         if (
           req.body.firmas.profesional?.firmaUrl &&
           req.body.firmas.profesional.firmaUrl !==
-            valoracionActual.firmas?.profesional?.firmaUrl
+          valoracionActual.firmas?.profesional?.firmaUrl
         ) {
           req.body.auditTrail.firmaProfesional = obtenerMetadatosPista(req);
           req.body.auditTrail.firmaProfesional.registroProfesional =
@@ -790,8 +790,8 @@ router.put(
       // Autocreación de sesiones en actualización si tiene plan y no existen
       let planDiferido = null;
       if (
-        valoracionActual.cod_consulta === "890264" ||
-        req.body.cod_consulta === "890264"
+        valoracionActual.cod_consulta === "890211" ||
+        req.body.cod_consulta === "890211"
       ) {
         const plan =
           req.body.moduloPerinatal?.planElegido ||

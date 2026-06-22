@@ -16,19 +16,19 @@ const ripsConfig = {
 
   // Códigos CUPS actualizados (Res. 2706 de 2025)
   codigosCUPS: {
-    // === CONSULTAS Y VALORACIONES (890264 - 890384) ===
+    // === CONSULTAS Y VALORACIONES (890211 - 890384) ===
     // Se usan estos códigos base para todas las valoraciones de ingreso
-    consultaFisiatriaPrimeraVez: '890264',
+    consultaFisiatriaPrimeraVez: '890211',
     consultaFisiatriaControl: '890384',
     juntaMedica: '890502',
-    
+
     // Mapeo de claves antiguas a nuevos códigos oficiales
-    consultaGeneral: '890264',
-    consultaPrenatal: '890264',
-    consultaPostnatal: '890264',
-    valoracionInicial: '890264',      // Valoración Niños -> Consulta 1ra Vez
-    valoracionPisoPelvis: '890264',   // Valoración Adultos -> Consulta 1ra Vez
-    valoracionLactancia: '890264',    // Valoración Lactancia -> Consulta 1ra Vez
+    consultaGeneral: '890211',
+    consultaPrenatal: '890211',
+    consultaPostnatal: '890211',
+    valoracionInicial: '890211',      // Valoración Niños -> Consulta 1ra Vez
+    valoracionPisoPelvis: '890211',   // Valoración Adultos -> Consulta 1ra Vez
+    valoracionLactancia: '890211',    // Valoración Lactancia -> Consulta 1ra Vez
 
     // === PROCEDIMIENTOS PEDIATRÍA (Neurodesarrollo/Estimulación) ===
     toxinaBotulinica: '861411',
@@ -42,7 +42,7 @@ const ripsConfig = {
     ecoPisoPelvico: '881411',
     ecoPelvicaGinecologica: '881410',
     terapiaFisicaSOD: '931000',
-    
+
     // Rehabilitación Funcional (Sesiones Piso Pélvico / Perinatales)
     rehabDeficienciaLeve: '938610',     // Sesión Estándar
     rehabDeficienciaModerada: '938611',
@@ -68,13 +68,13 @@ const ripsConfig = {
     consultaPrenatal: 90000,
     consultaPostnatal: 90000,
     consultaFisiatriaPrimeraVez: 90000,
-    
+
     // Procedimientos
     terapiaFisicaIndividual: 45000,
     terapiaFisicaGrupal: 35000,
     preparacionParto: 50000,
     reeducacionPisoPelvis: 50000,
-    
+
     // Nuevos
     integracionSensorial: 45000,
     rehabDeficienciaLeve: 50000,
@@ -92,7 +92,7 @@ const ripsConfig = {
     'Fisioterapia Pediátrica': '02',
     'Fisioterapia Obstétrica': '03'
   },
-  
+
   // Finalidades (Actualizadas)
   finalidades: {
     // Consultas
@@ -100,9 +100,9 @@ const ripsConfig = {
     consultaPrenatal: '05', // Prenatal (Si aplica) o 11
     consultaPostnatal: '05',
     consultaLactancia: '06', // Preconcepcional o 11
-    
+
     // Mapeos
-    '890264': '11',
+    '890211': '11',
     '890384': '11',
 
     // Procedimientos (Rehabilitación = 44)
@@ -110,7 +110,7 @@ const ripsConfig = {
     preparacionParto: '05',
     pisoPelvis: '44',
     rehabFuncional: '44',
-    
+
     // Mapeos Nuevos
     '933900': '44',
     '938610': '44',
@@ -162,19 +162,19 @@ const ripsConfig = {
   },
 
   // Métodos de utilidad
-  getValorServicio: function(tipoServicio) {
+  getValorServicio: function (tipoServicio) {
     return this.valoresServicios[tipoServicio] || 0;
   },
 
-  getCodigoCUPS: function(tipoProcedimiento) {
+  getCodigoCUPS: function (tipoProcedimiento) {
     return this.codigosCUPS[tipoProcedimiento] || this.codigosCUPS.consultaGeneral;
   },
 
-  getFinalidad: function(tipoServicio) {
+  getFinalidad: function (tipoServicio) {
     return this.finalidades[tipoServicio] || '11';
   },
 
-  getDiagnosticoCIE: function(tipoDiagnostico) {
+  getDiagnosticoCIE: function (tipoDiagnostico) {
     return this.diagnosticosCIE[tipoDiagnostico] || this.diagnosticosCIE.fisioterapiaGeneral;
   },
 
