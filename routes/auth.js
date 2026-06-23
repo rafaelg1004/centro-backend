@@ -236,7 +236,7 @@ router.post("/register", async (req, res) => {
       email,
       username: usuario,
       password_hash: passwordHash,
-      nombre_completo: nombre,
+      nombre: nombre,
       rol: rol || "auxiliar",
       registro_medico: registroMedico || "",
     });
@@ -622,6 +622,42 @@ router.get("/users", verificarToken(["administracion"]), async (req, res) => {
     res.json(usuarios);
   } catch (error) {
     console.error("Error obteniendo usuarios :", error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
+// Ruta para editar usuario (solo admin)
+router.put("/users/:id", verificarToken(["administracion"]), async (req, res) => {
+  const { nombre, email, rol, registroMedico } = req.body;
+  
+  if (rol && !["fisioterapeuta", "auxiliar", "administracion"].includes(rol)) {
+    return res.status(400).json({
+      error: "Rol inválido. Debe ser: fisioterapeuta, auxiliar o administracion",
+    });
+  }
+
+  try {
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    
+    // Validar email si se cambia
+    if (email && email !== usuario.email) {
+      const existeEmail = await Usuario.findOne({ where: { email } });
+      if (existeEmail) return res.status(400).json({ error: "El correo ya está en uso por otro usuario" });
+    }
+    
+    const actualizacion = {};
+    if (nombre !== undefined) actualizacion.nombre = nombre;
+    if (email !== undefined) actualizacion.email = email;
+    if (rol !== undefined) actualizacion.rol = rol;
+    if (registroMedico !== undefined) actualizacion.registro_medico = registroMedico;
+    
+    await usuario.update(actualizacion);
+    res.json({ mensaje: "Usuario actualizado correctamente", usuario });
+  } catch (error) {
+    console.error("Error actualizando usuario:", error);
     res.status(500).json({ error: "Error en el servidor" });
   }
 });
