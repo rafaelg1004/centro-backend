@@ -60,6 +60,17 @@ router.post("/", async (req, res) => {
       es_adulto: true,
     };
 
+    // Mapear datos de contacto si vienen en formato plano o anidado
+    const contactInfo = req.body.datos_contacto || req.body.datosContacto || {};
+    data.datos_contacto = {
+      direccion: req.body.direccion || contactInfo.direccion || null,
+      telefono: req.body.telefono || contactInfo.telefono || null,
+      celular: req.body.celular || contactInfo.celular || null,
+      nombreAcompanante: req.body.acompanante || contactInfo.nombreAcompanante || contactInfo.acompanante || req.body.nombreMadre || req.body.nombrePadre || null,
+      telefonoAcompanante: req.body.telefonoAcompanante || contactInfo.telefonoAcompanante || null,
+    };
+    data.datosContacto = data.datos_contacto; // Retrocompatibilidad en memoria
+
     const paciente = await Paciente.create(data);
     res.json({ mensaje: "Paciente registrado correctamente", id: paciente.id });
   } catch (error) {
