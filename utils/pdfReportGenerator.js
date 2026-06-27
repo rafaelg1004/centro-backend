@@ -54,26 +54,41 @@ class PDFReportGenerator {
 
         // --- HELPERS DE DIBUJO ---
         const dibujarTablaDosColumnas = async (titulo, campos) => {
-          const numRows = Math.ceil(campos.length / 2);
-          await checkSpace(30 + numRows * 16);
-          const startY = doc.y;
+          if (!campos || campos.length === 0) return;
           const tableWidth = doc.page.width - 100;
           const colWidth = tableWidth / 2;
 
-          // Header
-          doc.rect(50, startY, tableWidth, 16).fill('#F3F4F6');
-          doc.fillColor('#1F2937').fontSize(9).font('Helvetica-Bold').text(titulo.toUpperCase(), 55, startY + 4);
+          // Solo exigir espacio inicial para el encabezado y al menos 1 fila (36px)
+          await checkSpace(36);
 
-          let currentY = startY + 16;
-          doc.lineWidth(0.5).strokeColor('#D1D5DB');
-          doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          let currentY = doc.y;
+
+          const renderHeader = (esContinuacion = false) => {
+            doc.rect(50, currentY, tableWidth, 16).fill('#F3F4F6');
+            doc.fillColor('#1F2937').fontSize(9).font('Helvetica-Bold')
+              .text(`${titulo.toUpperCase()}${esContinuacion ? ' (CONT.)' : ''}`, 55, currentY + 4);
+            currentY += 16;
+            doc.lineWidth(0.5).strokeColor('#D1D5DB');
+            doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          };
+
+          renderHeader(false);
 
           for (let i = 0; i < campos.length; i += 2) {
+            // Si la siguiente fila excede el límite de la página, saltar de página y continuar la tabla
+            if (currentY + 16 > doc.page.height - 70) {
+              doc.addPage();
+              await addPageHeader(doc, false);
+              currentY = doc.y;
+              renderHeader(true);
+            }
+
             const rowY = currentY;
             const c1 = campos[i];
             const c2 = campos[i + 1];
 
-            // Borders
+            // Bordes verticales de la fila
+            doc.lineWidth(0.5).strokeColor('#D1D5DB');
             doc.moveTo(50, rowY).lineTo(50, rowY + 16).stroke();
             doc.moveTo(50 + colWidth, rowY).lineTo(50 + colWidth, rowY + 16).stroke();
             doc.moveTo(50 + tableWidth, rowY).lineTo(50 + tableWidth, rowY + 16).stroke();
@@ -94,11 +109,16 @@ class PDFReportGenerator {
         };
 
         const dibujarTablaUnaColumna = async (titulo, texto) => {
+          if (!texto) return;
           const tableWidth = doc.page.width - 100;
           doc.font('Helvetica').fontSize(8);
           const textHeight = doc.heightOfString(String(texto), { width: tableWidth - 10, align: 'justify' });
-          const totalHeight = 16 + textHeight + 12; // header + padding + text + margin
-          await checkSpace(totalHeight);
+          const totalHeight = 16 + textHeight + 12;
+
+          const spaceAvailable = doc.page.height - 70 - doc.y;
+          if (spaceAvailable < 40 || (totalHeight > spaceAvailable && spaceAvailable < 80)) {
+            await checkSpace(spaceAvailable + 1);
+          }
 
           const startY = doc.y;
           // Header
@@ -109,17 +129,16 @@ class PDFReportGenerator {
           doc.lineWidth(0.5).strokeColor('#D1D5DB');
           doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
 
-          // Borders
-          doc.moveTo(50, currentY).lineTo(50, currentY + textHeight + 8).stroke();
-          doc.moveTo(50 + tableWidth, currentY).lineTo(50 + tableWidth, currentY + textHeight + 8).stroke();
-
+          const initialY = currentY;
           doc.font('Helvetica').fontSize(8).fillColor('#4B5563')
             .text(String(texto), 55, currentY + 4, { width: tableWidth - 10, align: 'justify' });
 
-          currentY += textHeight + 8;
-          doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+          const finalY = doc.y + 4;
+          doc.moveTo(50, initialY).lineTo(50, finalY).stroke();
+          doc.moveTo(50 + tableWidth, initialY).lineTo(50 + tableWidth, finalY).stroke();
+          doc.moveTo(50, finalY).lineTo(50 + tableWidth, finalY).stroke();
 
-          doc.y = currentY + 10;
+          doc.y = finalY + 10;
         };
 
         const addPageHeader = async (doc, isFirstPage = false) => {
