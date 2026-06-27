@@ -11,7 +11,7 @@ const verificarBloqueo = (Model, resourceType) => {
 
             if (!id) return next();
 
-            const resource = await Model.findById(id);
+            const resource = Model.findByPk ? await Model.findByPk(id) : await Model.findById(id);
 
             if (!resource) {
                 return res.status(404).json({
@@ -24,7 +24,7 @@ const verificarBloqueo = (Model, resourceType) => {
                 // Log del intento de modificación de un registro bloqueado (Auditoría de Seguridad)
                 logger.warn('HC_SEGURIDAD', 'INTENTO_MODIFICACION_BLOQUEADO', {
                     user: req.usuario?.usuario || 'desconocido',
-                    paciente: resource.paciente?.toString() || 'desconocido',
+                    paciente: resource.paciente?.toString() || resource.paciente_id || 'desconocido',
                     valoracion: id,
                     ip: req.ip,
                     details: {
@@ -37,7 +37,7 @@ const verificarBloqueo = (Model, resourceType) => {
                 return res.status(403).json({
                     error: 'HC_BLOQUEADA',
                     mensaje: 'Este registro de historia clínica está bloqueado y es inmutable según la normativa de salud. No se permiten modificaciones ni eliminaciones.',
-                    fechaBloqueo: resource.fechaBloqueo
+                    fechaBloqueo: resource.fechaBloqueo || resource.fecha_bloqueo
                 });
             }
 
@@ -56,22 +56,31 @@ const verificarBloqueo = (Model, resourceType) => {
  */
 const bloquearRegistro = async (id, Model, resourceType, usuario = 'sistema') => {
     try {
-        const backup = await Model.findById(id);
+        const backup = Model.findByPk ? await Model.findByPk(id) : await Model.findById(id);
         if (!backup) return null;
         if (backup.bloqueada) return backup;
 
-        const locked = await Model.findByIdAndUpdate(id, {
-            bloqueada: true,
-            fechaBloqueo: new Date()
-        }, { new: true });
+        let locked;
+        if (Model.findByPk) {
+            await Model.update({
+                bloqueada: true,
+                fechaBloqueo: new Date()
+            }, { where: { id } });
+            locked = await Model.findByPk(id);
+        } else {
+            locked = await Model.findByIdAndUpdate(id, {
+                bloqueada: true,
+                fechaBloqueo: new Date()
+            }, { new: true });
+        }
 
         logger.info('HC_SEGURIDAD', 'CIERRE_REGISTRO_HC', {
             user: usuario,
-            paciente: locked.paciente?.toString() || 'desconocido',
+            paciente: locked.paciente?.toString() || locked.paciente_id || 'desconocido',
             valoracion: id,
             details: {
                 resourceType,
-                timestamp: locked.fechaBloqueo
+                timestamp: locked.fechaBloqueo || locked.fecha_bloqueo
             }
         });
 
