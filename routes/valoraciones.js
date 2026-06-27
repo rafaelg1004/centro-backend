@@ -4,6 +4,7 @@ const {
   ValoracionFisioterapia,
   EvolucionSesion,
   Paciente,
+  sequelize,
 } = require("../models-sequelize");
 const { Op } = require("sequelize");
 const { eliminarImagenesValoracion } = require("../utils/s3Utils");
@@ -225,7 +226,7 @@ router.post("/", validarImagenes, async (req, res) => {
       await sequelize.query(
         `INSERT INTO raw_inputs_backups (endpoint, method, paciente_id, payload) VALUES ($1, $2, $3, $4)`,
         {
-          bind: ['/valoraciones', 'POST', paciente || null, req.body]
+          bind: ['/valoraciones', 'POST', paciente || null, JSON.stringify(req.body)]
         }
       );
     } catch (auditErr) {
@@ -748,7 +749,7 @@ router.put(
         await sequelize.query(
           `INSERT INTO raw_inputs_backups (endpoint, method, paciente_id, valoracion_id, payload) VALUES ($1, $2, $3, $4, $5)`,
           {
-            bind: [`/valoraciones/${req.params.id}`, 'PUT', valoracionActual.paciente_id || null, req.params.id, req.body]
+            bind: [`/valoraciones/${req.params.id}`, 'PUT', valoracionActual.paciente_id || null, req.params.id, JSON.stringify(req.body)]
           }
         );
       } catch (auditErr) {
