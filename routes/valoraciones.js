@@ -457,7 +457,8 @@ router.get(
             }));
           }
 
-          const vJson = v.toJSON ? v.toJSON() : v;
+          let vJson = v.toJSON ? v.toJSON() : v;
+          vJson = { ...vJson, ...unmapValoracionData(vJson) };
 
           return {
             ...vJson,
@@ -567,31 +568,29 @@ router.get("/paciente/:pacienteId", async (req, res) => {
 
     const mapiado = await Promise.all(
       valoraciones.map(async (v) => {
-        let tipo = null;
+        let tipo = v.tipo_programa || null;
         let ruta = "/valoraciones/";
 
-        // Priorizar cod_consulta sobre tipoPrograma para mayor precisión
-        // Nota: cod_consulta puede incluir descripción (ej. "890211 - CONSULTA..."), usar startsWith
-        const codConsultaV = String(v.cod_consulta || '').split(' ')[0].trim();
-        if (codConsultaV === "890211") tipo = "Perinatal";
-        else if (codConsultaV === "890202") tipo = "Piso Pélvico";
-        else if (codConsultaV === "890201") tipo = "Pediatría";
-        else if (codConsultaV === "890203") tipo = "Lactancia";
-        else if (v.tipoPrograma) {
-          // Usar tipoPrograma solo si cod_consulta no está definido
-          if (v.tipoPrograma.includes("Lactancia")) tipo = "Lactancia";
-          else if (v.tipoPrograma.includes("Piso")) tipo = "Piso Pélvico";
-          else if (v.tipoPrograma === "Perinatal") tipo = "Perinatal";
-          else if (v.tipoPrograma === "Pediatría") tipo = "Pediatría";
-        }
-
-        // Si aún no hay tipo, revisar módulos poblados
         if (!tipo) {
-          if (tmpPop(v.modulo_lactancia)) tipo = "Lactancia";
-          else if (tmpPop(v.modulo_pediatria)) tipo = "Pediatría";
-          else if (tmpPop(v.modulo_piso_pelvico)) tipo = "Piso Pélvico";
-          else if (tmpPop(v.modulo_perinatal)) tipo = "Perinatal";
-          else tipo = "General";
+          // Detectar tipo basándose en contenido REAL de los módulos
+          if (tmpPop(v.modulo_lactancia)) {
+            tipo = "Lactancia";
+          } else if (tmpPop(v.modulo_pediatria)) {
+            tipo = "Pediatría";
+          } else if (tmpPop(v.modulo_piso_pelvico)) {
+            tipo = "Piso Pélvico";
+          } else if (tmpPop(v.modulo_perinatal)) {
+            tipo = "Perinatal";
+          }
+          // Fallback por cod_consulta (retrocompatibilidad)
+          else {
+            const codConsultaV = String(v.cod_consulta || '').split(' ')[0].trim();
+            if (codConsultaV === "890211") tipo = "Perinatal";
+            else if (codConsultaV === "890202") tipo = "Piso Pélvico";
+            else if (codConsultaV === "890201") tipo = "Pediatría";
+            else if (codConsultaV === "890203") tipo = "Lactancia";
+            else tipo = "General";
+          }
         }
 
         // Si es una valoración migrada, podemos añadir un distintivo
@@ -600,7 +599,8 @@ router.get("/paciente/:pacienteId", async (req, res) => {
         }
 
         let sesionesIndependientes = [];
-        if (codConsultaV === "890211") {
+        const codConsultaV2 = String(v.cod_consulta || '').split(' ')[0].trim();
+        if (codConsultaV2 === "890211") {
           const rawSesiones = await EvolucionSesion.findAll({
             where: { valoracion_id: v.id },
           });
@@ -612,8 +612,11 @@ router.get("/paciente/:pacienteId", async (req, res) => {
           }));
         }
 
+        let vJson = v.toJSON ? v.toJSON() : v;
+        vJson = { ...vJson, ...unmapValoracionData(vJson) };
+
         return {
-          ...v.toJSON(),
+          ...vJson,
           tipo,
           ruta: `${ruta}${v.id}`,
           fecha: v.fecha_inicio_atencion,
@@ -648,7 +651,8 @@ router.get(
       const valoracion = await ValoracionFisioterapia.findByPk(req.params.id);
       if (!valoracion) return res.status(404).json({ error: "No encontrada" });
 
-      const obj = valoracion.toJSON();
+      let obj = valoracion.toJSON();
+      obj = { ...obj, ...unmapValoracionData(obj) };
 
       // Obtener paciente por separado usando paciente_id
       console.log("[DEBUG] Valoracion paciente_id:", obj.paciente_id);
@@ -850,4 +854,37 @@ router.put(
     }
   },
 );
+const unmapValoracionData = (obj) => {
+  const unmapped = { ...obj };
+  
+  if (obj.paciente_id !== undefined) unmapped.paciente = obj.paciente_id;
+  if (obj.tipo_programa !== undefined) unmapped.tipoPrograma = obj.tipo_programa;
+  if (obj.fecha_inicio_atencion !== undefined) unmapped.fechaInicioAtencion = obj.fecha_inicio_atencion;
+  if (obj.num_autorizacion !== undefined) unmapped.numAutorizacion = obj.num_autorizacion;
+  if (obj.cod_consulta !== undefined) unmapped.codConsulta = obj.cod_consulta;
+  if (obj.modalidad_grupo_servicio_tec_sal !== undefined) unmapped.modalidadGrupoServicioTecSal = obj.modalidad_grupo_servicio_tec_sal;
+  if (obj.grupo_servicios !== undefined) unmapped.grupoServicios = obj.grupo_servicios;
+  if (obj.finalidad_tecnologia_salud !== undefined) unmapped.finalidadTecnologiaSalud = obj.finalidad_tecnologia_salud;
+  if (obj.causa_motivo_atencion !== undefined) unmapped.causaMotivoAtencion = obj.causa_motivo_atencion;
+  if (obj.cod_diagnostico_principal !== undefined) unmapped.codDiagnosticoPrincipal = obj.cod_diagnostico_principal;
+  if (obj.tipo_diagnostico_principal !== undefined) unmapped.tipoDiagnosticoPrincipal = obj.tipo_diagnostico_principal;
+  if (obj.vr_servicio !== undefined) unmapped.vrServicio = obj.vr_servicio;
+  if (obj.concepto_recaudo !== undefined) unmapped.conceptoRecaudo = obj.concepto_recaudo;
+  if (obj.motivo_consulta !== undefined) unmapped.motivoConsulta = obj.motivo_consulta;
+  if (obj.enfermedad_actual !== undefined) unmapped.enfermedadActual = obj.enfermedad_actual;
+  if (obj.signos_vitales !== undefined) unmapped.signosVitales = obj.signos_vitales;
+  if (obj.modulo_pediatria !== undefined) unmapped.moduloPediatria = obj.modulo_pediatria;
+  if (obj.modulo_piso_pelvico !== undefined) unmapped.moduloPisoPelvico = obj.modulo_piso_pelvico;
+  if (obj.modulo_lactancia !== undefined) unmapped.moduloLactancia = obj.modulo_lactancia;
+  if (obj.modulo_perinatal !== undefined) unmapped.moduloPerinatal = obj.modulo_perinatal;
+  if (obj.examen_fisico !== undefined) unmapped.examenFisico = obj.examen_fisico;
+  if (obj.diagnostico_fisioterapeutico !== undefined) unmapped.diagnosticoFisioterapeutico = obj.diagnostico_fisioterapeutico;
+  if (obj.plan_tratamiento !== undefined) unmapped.planTratamiento = obj.plan_tratamiento;
+  if (obj.fecha_bloqueo !== undefined) unmapped.fechaBloqueo = obj.fecha_bloqueo;
+  if (obj.sello_integridad !== undefined) unmapped.selloIntegridad = obj.sello_integridad;
+  if (obj.audit_trail !== undefined) unmapped.auditTrail = obj.audit_trail;
+
+  return unmapped;
+};
+
 module.exports = router;
