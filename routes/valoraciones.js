@@ -857,7 +857,10 @@ router.put(
 const unmapValoracionData = (obj) => {
   const unmapped = { ...obj };
   
-  if (obj.paciente_id !== undefined) unmapped.paciente = obj.paciente_id;
+  // Only override paciente with paciente_id if paciente is not already an object (e.g. from a Sequelize include)
+  if (obj.paciente_id !== undefined && typeof obj.paciente !== 'object') {
+    unmapped.paciente = obj.paciente_id;
+  }
   if (obj.tipo_programa !== undefined) unmapped.tipoPrograma = obj.tipo_programa;
   if (obj.fecha_inicio_atencion !== undefined) unmapped.fechaInicioAtencion = obj.fecha_inicio_atencion;
   if (obj.num_autorizacion !== undefined) unmapped.numAutorizacion = obj.num_autorizacion;
