@@ -57,15 +57,15 @@ class Logger {
       category,
       action,
       username: data.user || "desconocido",
-      paciente_id: data.paciente || null,
+      paciente_id: (data.paciente && data.paciente !== "desconocido") ? data.paciente : null,
       valoracion_id: data.valoracion || "desconocido",
       details: data.details || {},
       ip: data.ip || "",
       user_agent: data.userAgent || "",
     };
 
-    // Formato para consola
-    const consoleMessage = `[${new Date().toISOString()}] ${level} [${category}]: ${action} - Usuario: ${logData.username} - Paciente: ${data.paciente || "desconocido"} - Valoración: ${logData.valoracion_id}`;
+    // Formato para consola usando la hora local
+    const consoleMessage = `[${new Date().toLocaleString()}] ${level} [${category}]: ${action} - Usuario: ${logData.username} - Paciente: ${data.paciente || "desconocido"} - Valoración: ${logData.valoracion_id}`;
 
     // Log en consola
     switch (level) {
@@ -83,13 +83,12 @@ class Logger {
         break;
     }
 
-    // NOTA: Guardado en base de datos desactivado. Solo logs en consola.
-    // Para reactivar, descomenta las siguientes líneas:
-    // try {
-    //   await Log.createLog(logData);
-    // } catch (dbError) {
-    //   console.error("❌ Error guardando log en BD:", dbError.message);
-    // }
+    // Guardado en base de datos habilitado
+    try {
+      await Log.createLog(logData);
+    } catch (dbError) {
+      console.error("❌ Error guardando log en BD:", dbError.message);
+    }
   }
 
   /**
@@ -97,9 +96,9 @@ class Logger {
    */
   auditMiddleware() {
     return (req, res, next) => {
-      // Solo registrar operaciones de modificación (POST, PUT, DELETE) y login
+      // Registrar todas las operaciones (GET, POST, PUT, DELETE) y login
       const shouldLog =
-        ["POST", "PUT", "DELETE"].includes(req.method) ||
+        ["GET", "POST", "PUT", "DELETE"].includes(req.method) ||
         req.path.includes("/auth/login") ||
         req.path.includes("/auth/verify-2fa-login");
 
@@ -134,6 +133,9 @@ class Logger {
         details: {
           path: req.originalUrl,
           method: req.method,
+          body: ["POST", "PUT", "PATCH"].includes(req.method)
+            ? { ...req.body, ...(req.body.password && { password: "***" }) }
+            : undefined,
         },
       });
 

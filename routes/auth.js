@@ -311,7 +311,7 @@ const verificarToken = (rolesPermitidos = []) => {
         !rolesPermitidos.includes(decoded.rol)
       ) {
         logger.logAuth("ACCESO_DENEGADO", {
-          user: decoded.username,
+          user: decoded.usuario,
           ip: clientIP,
           userAgent,
           details: {
@@ -329,7 +329,7 @@ const verificarToken = (rolesPermitidos = []) => {
       }
 
       logger.logAuth("ACCESO_PERMITIDO", {
-        user: decoded.username,
+        user: decoded.usuario,
         ip: clientIP,
         userAgent,
         details: {

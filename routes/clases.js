@@ -408,6 +408,14 @@ router.delete("/:id", async (req, res) => {
       where: { clase_id: req.params.id },
     });
 
+    // Validar que no haya niños ya firmados
+    const tieneFirmados = ninosClase.some((n) => n.firma && n.firma.trim() !== "");
+    if (tieneFirmados) {
+      return res.status(400).json({
+        error: "No se puede eliminar la clase porque tiene asistencia registrada (niños firmados).",
+      });
+    }
+
     // Recopilar facturas únicas para recalcular después
     const facturasAfectadas = new Set();
     for (const ninoClase of ninosClase) {
