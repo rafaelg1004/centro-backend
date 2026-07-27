@@ -46,6 +46,15 @@ module.exports = (sequelize, DataTypes) => {
     valoracion_id: {
       type: DataTypes.STRING(100)
     },
+    method: {
+      type: DataTypes.STRING(20)
+    },
+    path: {
+      type: DataTypes.STRING(255)
+    },
+    body: {
+      type: DataTypes.JSONB
+    },
     details: {
       type: DataTypes.JSONB,
       defaultValue: {}

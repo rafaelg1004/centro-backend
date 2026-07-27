@@ -11,6 +11,10 @@ const sequelize = new Sequelize(
     host: process.env.PGHOST || 'localhost',
     port: process.env.PGPORT || 5432,
     dialect: 'postgres',
+    timezone: '-05:00', // Zona horaria de Colombia
+    dialectOptions: {
+      useUTC: false // Forzar uso de zona horaria local
+    },
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
       max: 10,
