@@ -42,11 +42,21 @@ const upload = multer({
   })
 });
 
-router.post('/upload', upload.single('imagen'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No se subió ningún archivo' });
-  }
-  res.json({ url: req.file.location });
+router.post('/upload', (req, res, next) => {
+  const uploadSingle = upload.single('imagen');
+  
+  uploadSingle(req, res, function (err) {
+    if (err) {
+      console.error('Error en multer upload:', err);
+      return res.status(500).json({ error: 'Error al procesar la subida', details: err.message });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo' });
+    }
+    
+    res.json({ url: req.file.location });
+  });
 });
 
 // Función auxiliar para extraer key de S3 desde una URL

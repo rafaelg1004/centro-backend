@@ -125,6 +125,12 @@ app.use(
   require("./routes/logs"),
 );
 
+// === Global Error Handler ===
+app.use((err, req, res, next) => {
+  console.error("❌ Error global no manejado:", err);
+  res.status(500).json({ error: "Error interno del servidor", details: err.message });
+});
+
 // === Inicialización ===
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor activo en puerto ${PORT}`);
