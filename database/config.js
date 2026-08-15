@@ -2,6 +2,11 @@ require('dotenv').config();
 
 const { Sequelize } = require('sequelize');
 
+const pg = require('pg');
+
+// Forzar a que pg retorne columnas tipo DATE (OID 1082) como strings 'YYYY-MM-DD' sin conversión a objeto Date de JS
+pg.types.setTypeParser(1082, (val) => val);
+
 // Configuración de la conexión a PostgreSQL
 const sequelize = new Sequelize(
   process.env.PGDATABASE || 'dmamitas',
@@ -13,7 +18,8 @@ const sequelize = new Sequelize(
     dialect: 'postgres',
     timezone: '-05:00', // Zona horaria de Colombia
     dialectOptions: {
-      useUTC: false // Forzar uso de zona horaria local
+      useUTC: false, // Forzar uso de zona horaria local
+      dateStrings: true
     },
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
