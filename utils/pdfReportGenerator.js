@@ -1,5 +1,6 @@
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
+const { parseFechaLocal } = require('./dateUtils');
 
 class PDFReportGenerator {
   async generateValuationPDF(valuation, paciente, type = 'nino', profesional = {}, config = {}) {
@@ -33,7 +34,8 @@ class PDFReportGenerator {
         const calcEdad = (fechaNac) => {
           if (!fechaNac) return null;
           const hoy = new Date();
-          const nac = new Date(fechaNac);
+          const nac = parseFechaLocal(fechaNac);
+          if (!nac || isNaN(nac.getTime())) return null;
           let anos = hoy.getFullYear() - nac.getFullYear();
           let meses = hoy.getMonth() - nac.getMonth();
           if (hoy.getDate() < nac.getDate()) meses--;
@@ -43,7 +45,10 @@ class PDFReportGenerator {
 
         const fmtFecha = (d) => {
           if (!d) return null;
-          try { return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(); }
+          try {
+            const parsed = parseFechaLocal(d);
+            return parsed ? parsed.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : String(d);
+          }
           catch { return String(d); }
         };
 

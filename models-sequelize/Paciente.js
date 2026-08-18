@@ -1,3 +1,5 @@
+const { parseFechaLocal } = require("../utils/dateUtils");
+
 // ============================================
 // MODELO: PACIENTE
 // ============================================
@@ -58,50 +60,46 @@ module.exports = (sequelize, DataTypes) => {
       // Datos Asistenciales
       estado_civil: DataTypes.STRING(50),
       ocupacion: DataTypes.STRING(100),
-      nivel_educativo: DataTypes.STRING(100),
       aseguradora: DataTypes.STRING(100),
-      medico_tratante: DataTypes.STRING(100),
       lugar_nacimiento: DataTypes.STRING(100),
-      // Datos Maternos
+      nivel_educativo: DataTypes.STRING(100),
+      medico_tratante: DataTypes.STRING(100),
       estado_embarazo: DataTypes.STRING(50),
       nombre_bebe: DataTypes.STRING(100),
-      fum: DataTypes.STRING(50),
-      semanas_gestacion: DataTypes.STRING(50),
-      fecha_probable_parto: DataTypes.STRING(50),
-      // Datos Pediátricos
-      nombre_madre: DataTypes.STRING(100),
+      fum: DataTypes.DATEONLY,
+      semanas_gestacion: DataTypes.INTEGER,
+      fecha_probable_parto: DataTypes.DATEONLY,
+
+      // Campos Pediátricos Adicionales
       tipo_documento_madre: DataTypes.STRING(50),
       num_documento_madre: DataTypes.STRING(50),
-      edad_madre: DataTypes.STRING(50),
-      ocupacion_madre: DataTypes.STRING(100),
-      nombre_padre: DataTypes.STRING(100),
       tipo_documento_padre: DataTypes.STRING(50),
       num_documento_padre: DataTypes.STRING(50),
-      edad_padre: DataTypes.STRING(50),
+      nombre_madre: DataTypes.STRING(100),
+      edad_madre: DataTypes.INTEGER,
+      ocupacion_madre: DataTypes.STRING(100),
+      nombre_padre: DataTypes.STRING(100),
+      edad_padre: DataTypes.INTEGER,
       ocupacion_padre: DataTypes.STRING(100),
-      pediatra: DataTypes.STRING(100),
-      peso: DataTypes.STRING(50),
-      talla: DataTypes.STRING(50),
-      // JSONB para campos complejos
+
+      // Contacto / Datos adicionales (almacenados como JSONB en Postgres)
       datos_contacto: {
         type: DataTypes.JSONB,
         defaultValue: {},
       },
-      consentimiento_datos: {
+      datos_adicionales: {
         type: DataTypes.JSONB,
         defaultValue: {},
       },
+      pediatra: DataTypes.STRING(100),
+      peso: DataTypes.FLOAT,
+      talla: DataTypes.FLOAT,
     },
     {
       tableName: "pacientes",
       timestamps: true,
-      underscored: true,
-      indexes: [
-        { fields: ["num_documento_identificacion"] },
-        { fields: ["nombres"] },
-        { fields: ["apellidos"] },
-        { fields: ["es_adulto"] },
-      ],
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   );
 

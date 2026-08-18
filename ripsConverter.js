@@ -5,6 +5,7 @@
 
 // Eliminado mongoose
 const ripsConfig = require('./ripsConfig');
+const { parseFechaLocal } = require('./utils/dateUtils');
 
 // Cache de códigos CUPS cargados de la BD
 let codigosCUPSCache = null;
@@ -544,7 +545,8 @@ class RIPSConverter {
 
   calcularEdad(fechaNacimiento) {
     const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
+    const nacimiento = parseFechaLocal(fechaNacimiento);
+    if (!nacimiento || isNaN(nacimiento.getTime())) return 0;
     let edad = hoy.getFullYear() - nacimiento.getFullYear();
     const mes = hoy.getMonth() - nacimiento.getMonth();
     if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {

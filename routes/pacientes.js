@@ -1,5 +1,6 @@
 const express = require("express");
 const { Paciente } = require("../models-sequelize");
+const { parseFechaLocal } = require("../utils/dateUtils");
 const path = require("path");
 const fs = require("fs");
 
@@ -145,7 +146,7 @@ router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
       const fechaNac = p.fecha_nacimiento;
       if (fechaNac) {
         const hoy = new Date();
-        const nacimiento = new Date(fechaNac);
+        const nacimiento = parseFechaLocal(fechaNac);
 
         // Si es niño (RC/TI), calcular edad en meses para el frontend legacy
         const esNino = !p.es_adulto;
@@ -226,7 +227,7 @@ router.get(
         const fechaNac = p.fecha_nacimiento;
         if (fechaNac) {
           const hoy = new Date();
-          const nacimiento = new Date(fechaNac);
+          const nacimiento = parseFechaLocal(fechaNac);
           const esNino = !p.es_adulto;
           if (esNino) {
             edad =

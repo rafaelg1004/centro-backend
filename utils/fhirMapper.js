@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const uuidv4 = () => crypto.randomUUID();
 const ripsConfig = require('../ripsConfig');
+const { obtenerFechaString } = require('./dateUtils');
 
 class FHIRMapper {
   constructor() {
@@ -97,7 +98,7 @@ class FHIRMapper {
       birthDate: (() => {
         if (!p.fechaNacimiento) return undefined;
         try {
-          return new Date(p.fechaNacimiento).toISOString().split('T')[0];
+          return obtenerFechaString(p.fechaNacimiento) || undefined;
         } catch (e) {
           return undefined; // Evitar el fallo si la fecha es muy corrupta
         }

@@ -618,8 +618,17 @@ router.get("/users", verificarToken(["administracion"]), async (req, res) => {
   try {
     const usuarios = await Usuario.findAll({
       attributes: { exclude: ["password_hash", "two_factor_secret"] },
+      order: [["username", "ASC"]],
     });
-    res.json(usuarios);
+    const mapped = usuarios.map((u) => {
+      const json = u.toJSON();
+      return {
+        ...json,
+        twoFactorEnabled: json.two_factor_enabled || false,
+        bloqueadoHasta: json.bloqueado_hasta || null,
+      };
+    });
+    res.json(mapped);
   } catch (error) {
     console.error("Error obteniendo usuarios :", error);
     res.status(500).json({ error: "Error en el servidor" });

@@ -10,6 +10,7 @@
  */
 const express = require("express");
 const { Paciente } = require("../models-sequelize");
+const { parseFechaLocal } = require("../utils/dateUtils");
 const { Op } = require("sequelize");
 
 const router = express.Router();
@@ -98,7 +99,7 @@ router.get("/", async (req, res) => {
       let edad = 0;
       if (p.fecha_nacimiento) {
         const hoy = new Date();
-        const nacimiento = new Date(p.fecha_nacimiento);
+        const nacimiento = parseFechaLocal(p.fecha_nacimiento);
         edad = hoy.getFullYear() - nacimiento.getFullYear();
         if (
           hoy.getMonth() < nacimiento.getMonth() ||
