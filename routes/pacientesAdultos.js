@@ -100,13 +100,15 @@ router.get("/", async (req, res) => {
       if (p.fecha_nacimiento) {
         const hoy = new Date();
         const nacimiento = parseFechaLocal(p.fecha_nacimiento);
-        edad = hoy.getFullYear() - nacimiento.getFullYear();
-        if (
-          hoy.getMonth() < nacimiento.getMonth() ||
-          (hoy.getMonth() === nacimiento.getMonth() &&
-            hoy.getDate() < nacimiento.getDate())
-        ) {
-          edad--;
+        if (nacimiento && !isNaN(nacimiento.getTime())) {
+          edad = hoy.getFullYear() - nacimiento.getFullYear();
+          if (
+            hoy.getMonth() < nacimiento.getMonth() ||
+            (hoy.getMonth() === nacimiento.getMonth() &&
+              hoy.getDate() < nacimiento.getDate())
+          ) {
+            edad--;
+          }
         }
       }
 

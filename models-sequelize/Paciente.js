@@ -87,7 +87,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSONB,
         defaultValue: {},
       },
-      datos_adicionales: {
+      consentimiento_datos: {
         type: DataTypes.JSONB,
         defaultValue: {},
       },

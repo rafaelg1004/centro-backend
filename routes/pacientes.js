@@ -123,7 +123,7 @@ router.post("/", async (req, res) => {
 
 router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
   try {
-    const { tipo } = req.query;
+    const { tipo, limite, limit } = req.query;
     let whereClause = {};
 
     if (tipo === "nino") {
@@ -132,10 +132,17 @@ router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
       whereClause.es_adulto = true;
     }
 
-    const pacientes = await Paciente.findAll({
+    const queryOptions = {
       where: whereClause,
       order: [["nombres", "ASC"]],
-    });
+    };
+
+    const maxLimit = parseInt(limite || limit, 10);
+    if (!isNaN(maxLimit) && maxLimit > 0) {
+      queryOptions.limit = maxLimit;
+    }
+
+    const pacientes = await Paciente.findAll(queryOptions);
 
     console.log(
       `[DEBUG] Pacientes encontrados: ${pacientes.length} (query: ${JSON.stringify(whereClause)})`,
@@ -148,21 +155,23 @@ router.get("/", logAccesoMiddleware("LISTAR_PACIENTES"), async (req, res) => {
         const hoy = new Date();
         const nacimiento = parseFechaLocal(fechaNac);
 
-        // Si es niño (RC/TI), calcular edad en meses para el frontend legacy
-        const esNino = !p.es_adulto;
-        if (esNino) {
-          edad =
-            (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
-            (hoy.getMonth() - nacimiento.getMonth());
-        } else {
-          // Si es adulto, edad en años
-          edad = hoy.getFullYear() - nacimiento.getFullYear();
-          if (
-            hoy.getMonth() < nacimiento.getMonth() ||
-            (hoy.getMonth() === nacimiento.getMonth() &&
-              hoy.getDate() < nacimiento.getDate())
-          ) {
-            edad--;
+        if (nacimiento && !isNaN(nacimiento.getTime())) {
+          // Si es niño (RC/TI), calcular edad en meses para el frontend legacy
+          const esNino = !p.es_adulto;
+          if (esNino) {
+            edad =
+              (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
+              (hoy.getMonth() - nacimiento.getMonth());
+          } else {
+            // Si es adulto, edad en años
+            edad = hoy.getFullYear() - nacimiento.getFullYear();
+            if (
+              hoy.getMonth() < nacimiento.getMonth() ||
+              (hoy.getMonth() === nacimiento.getMonth() &&
+                hoy.getDate() < nacimiento.getDate())
+            ) {
+              edad--;
+            }
           }
         }
       }
@@ -228,19 +237,21 @@ router.get(
         if (fechaNac) {
           const hoy = new Date();
           const nacimiento = parseFechaLocal(fechaNac);
-          const esNino = !p.es_adulto;
-          if (esNino) {
-            edad =
-              (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
-              (hoy.getMonth() - nacimiento.getMonth());
-          } else {
-            edad = hoy.getFullYear() - nacimiento.getFullYear();
-            if (
-              hoy.getMonth() < nacimiento.getMonth() ||
-              (hoy.getMonth() === nacimiento.getMonth() &&
-                hoy.getDate() < nacimiento.getDate())
-            ) {
-              edad--;
+          if (nacimiento && !isNaN(nacimiento.getTime())) {
+            const esNino = !p.es_adulto;
+            if (esNino) {
+              edad =
+                (hoy.getFullYear() - nacimiento.getFullYear()) * 12 +
+                (hoy.getMonth() - nacimiento.getMonth());
+            } else {
+              edad = hoy.getFullYear() - nacimiento.getFullYear();
+              if (
+                hoy.getMonth() < nacimiento.getMonth() ||
+                (hoy.getMonth() === nacimiento.getMonth() &&
+                  hoy.getDate() < nacimiento.getDate())
+              ) {
+                edad--;
+              }
             }
           }
         }
