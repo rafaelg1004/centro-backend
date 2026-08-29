@@ -168,6 +168,38 @@ class Logger {
   }
 
   /**
+   * Sanitiza y resume de forma segura la respuesta para que no sature la BD ni filtre secretos
+   */
+  sanitizeResponse(data) {
+    if (data === undefined || data === null) return undefined;
+    if (typeof data !== "object") return data;
+
+    // Si es un array grande (ej: lista de 200 pacientes), guardar cantidad y muestra de los primeros
+    if (Array.isArray(data)) {
+      if (data.length > 5) {
+        return {
+          totalElementos: data.length,
+          muestra: data.slice(0, 3).map((item) => this.sanitizeBody(item)),
+        };
+      }
+      return data.map((item) => this.sanitizeBody(item));
+    }
+
+    // Si es un objeto, sanitizar campos sensibles y arrays internos grandes
+    const sanitized = this.sanitizeBody(data);
+    for (const key of Object.keys(sanitized)) {
+      if (Array.isArray(sanitized[key]) && sanitized[key].length > 5) {
+        sanitized[key] = {
+          total: sanitized[key].length,
+          muestra: sanitized[key].slice(0, 3).map((it) => this.sanitizeBody(it)),
+        };
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
    * Middleware de Auditoría - Registra operaciones importantes sin saturar con GETs repetitivos
    */
   auditMiddleware() {
@@ -224,6 +256,8 @@ class Logger {
           req.body?.paciente_id ||
           (category === "PACIENTE" && data?.id ? data.id : null);
 
+        const sanitizedResponse = self.sanitizeResponse(data);
+
         self.log(level, category, action, {
           user: username,
           paciente: pacienteCandidate,
@@ -239,7 +273,7 @@ class Logger {
             duration: `${duration}ms`,
             params: Object.keys(req.query || {}).length > 0 ? req.query : undefined,
             body: sanitizedBody,
-            response: statusCode >= 400 ? data : undefined,
+            response: sanitizedResponse,
           },
         });
 
