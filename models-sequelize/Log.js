@@ -24,9 +24,7 @@ module.exports = (sequelize, DataTypes) => {
     category: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      validate: {
-        isIn: [['AUTH', 'PACIENTE', 'VALORACION', 'CLASE', 'RIPS', 'API', 'SYSTEM', 'HC_SEGURIDAD']]
-      }
+      defaultValue: 'API'
     },
     action: {
       type: DataTypes.STRING(100),
@@ -38,22 +36,23 @@ module.exports = (sequelize, DataTypes) => {
     },
     paciente_id: {
       type: DataTypes.UUID,
-      references: {
-        model: 'pacientes',
-        key: 'id'
-      }
+      allowNull: true
     },
     valoracion_id: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(100),
+      allowNull: true
     },
     method: {
-      type: DataTypes.STRING(20)
+      type: DataTypes.STRING(20),
+      allowNull: true
     },
     path: {
-      type: DataTypes.STRING(255)
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     body: {
-      type: DataTypes.JSONB
+      type: DataTypes.JSONB,
+      allowNull: true
     },
     details: {
       type: DataTypes.JSONB,

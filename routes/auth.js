@@ -328,18 +328,6 @@ const verificarToken = (rolesPermitidos = []) => {
         });
       }
 
-      logger.logAuth("ACCESO_PERMITIDO", {
-        user: decoded.usuario,
-        ip: clientIP,
-        userAgent,
-        details: {
-          mensaje: "Acceso permitido a endpoint protegido",
-          endpoint: req.originalUrl,
-          metodo: req.method,
-          rol: decoded.rol,
-        },
-      });
-
       req.usuario = decoded;
       next();
     } catch (error) {
@@ -576,16 +564,6 @@ router.get("/me", verificarToken(), async (req, res) => {
       });
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
-
-    logger.logAuth("INFO_USUARIO_CONSULTADA", {
-      user: usuario.usuario,
-      ip: clientIP,
-      userAgent,
-      details: {
-        mensaje: "Información del usuario consultada",
-        rol: usuario.rol,
-      },
-    });
 
     res.json({
       id: usuario.id,

@@ -32,12 +32,13 @@ async function initDatabase() {
       .join(", ")}`,
   );
 
-  // Asegurar que la tabla de borradores existe sin alterar destructivamente el resto
+  // Asegurar que las tablas de soporte existan y estén actualizadas
   try {
     await models.BorradorFormulario.sync({ alter: true });
-    console.log("✅ Tabla de borradores sincronizada correctamente");
+    await models.Log.sync({ alter: true });
+    console.log("✅ Tablas de auditoría y borradores sincronizadas correctamente");
   } catch (error) {
-    console.error("❌ Error sincronizando tabla de borradores:", error);
+    console.error("❌ Error sincronizando tablas de soporte:", error);
   }
 }
 
