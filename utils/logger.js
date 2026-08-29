@@ -239,7 +239,7 @@ class Logger {
         else if (pathLower.includes("/clases")) category = "CLASE";
         else if (pathLower.includes("/rips")) category = "RIPS";
         else if (pathLower.includes("/sesiones")) category = "VALORACION";
-        else if (pathLower.includes("/borradores")) category = "PACIENTE";
+        else if (pathLower.includes("/borradores")) category = "BORRADOR";
         else if (pathLower.includes("/pagopaquete")) category = "PAGOS";
         else if (pathLower.includes("/configuracion")) category = "CONFIGURACION";
 
