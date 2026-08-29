@@ -89,11 +89,18 @@ class Logger {
       "/api/health",
       "/api/system/health",
       "/api/system/metrics",
+      "/api/auth/me",
       "/api/proxy-images",
       "/api/proxyImages",
+      "/api/logs", // Evitar loggear la propia consulta de logs
     ];
     if (ignoredPaths.includes(cleanPath)) return true;
-    if (cleanPath.startsWith("/static/") || cleanPath.endsWith(".png") || cleanPath.endsWith(".ico")) {
+    if (
+      cleanPath.startsWith("/api/system/") ||
+      cleanPath.startsWith("/static/") ||
+      cleanPath.endsWith(".png") ||
+      cleanPath.endsWith(".ico")
+    ) {
       return true;
     }
     return false;
@@ -121,9 +128,9 @@ class Logger {
       username: data.user || data.username || "desconocido",
       paciente_id: validPacienteId,
       valoracion_id: data.valoracion ? String(data.valoracion).substring(0, 100) : null,
-      method: data.details?.method || data.method || null,
-      path: data.details?.path || data.path || null,
-      body: data.details?.body || data.body || null,
+      method: data.method || data.details?.method || null,
+      path: data.path || data.details?.path || null,
+      body: data.body || data.details?.body || null,
       details: data.details || {},
       ip: data.ip || "",
       user_agent: data.userAgent || data.user_agent || "",
@@ -165,8 +172,8 @@ class Logger {
    */
   auditMiddleware() {
     return (req, res, next) => {
-      // Ignorar pings de health check y assets estáticos
-      if (this.isIgnoredPath(req.path)) {
+      // Ignorar pings de health check, polling y assets estáticos
+      if (this.isIgnoredPath(req.path) || this.isIgnoredPath(req.originalUrl)) {
         return next();
       }
 
@@ -183,66 +190,58 @@ class Logger {
         const duration = Date.now() - startTime;
         const statusCode = res.statusCode;
 
-        // Determinar si esta petición debe guardarse en auditoría
-        const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
-        const isAuthAction =
-          req.originalUrl.includes("/auth/login") ||
-          req.originalUrl.includes("/auth/verify-2fa") ||
-          req.originalUrl.includes("/auth/cambiar-password") ||
-          req.originalUrl.includes("/auth/recuperar-password");
-        const isError = statusCode >= 400;
+        // Extraer usuario autenticado o desde el body
+        const username =
+          req.usuario?.username ||
+          req.usuario?.usuario ||
+          req.body?.usuario ||
+          req.body?.username ||
+          "desconocido";
 
-        // Guardar si es modificación, evento de autenticación o error
-        const shouldAudit = isMutation || isAuthAction || isError;
+        // Determinar categoría según ruta
+        let category = "API";
+        const pathLower = req.originalUrl.toLowerCase();
+        if (pathLower.includes("/pacientes")) category = "PACIENTE";
+        else if (pathLower.includes("/valoraciones") || pathLower.includes("/consentimiento")) category = "VALORACION";
+        else if (pathLower.includes("/auth")) category = "AUTH";
+        else if (pathLower.includes("/clases")) category = "CLASE";
+        else if (pathLower.includes("/rips")) category = "RIPS";
+        else if (pathLower.includes("/sesiones")) category = "VALORACION";
+        else if (pathLower.includes("/borradores")) category = "PACIENTE";
+        else if (pathLower.includes("/pagopaquete")) category = "PAGOS";
+        else if (pathLower.includes("/configuracion")) category = "CONFIGURACION";
 
-        if (shouldAudit) {
-          // Extraer usuario autenticado o desde el body
-          const username =
-            req.usuario?.username ||
-            req.usuario?.usuario ||
-            req.body?.usuario ||
-            req.body?.username ||
-            "desconocido";
+        const level = statusCode >= 500 ? "ERROR" : statusCode >= 400 ? "WARN" : "INFO";
+        const action = req.method === "GET" ? `CONSULTAR_${category}` : `${req.method}_${category}`;
 
-          // Determinar categoría según ruta
-          let category = "API";
-          const pathLower = req.originalUrl.toLowerCase();
-          if (pathLower.includes("/pacientes")) category = "PACIENTE";
-          else if (pathLower.includes("/valoraciones") || pathLower.includes("/consentimiento")) category = "VALORACION";
-          else if (pathLower.includes("/auth")) category = "AUTH";
-          else if (pathLower.includes("/clases")) category = "CLASE";
-          else if (pathLower.includes("/rips")) category = "RIPS";
-          else if (pathLower.includes("/sesiones")) category = "VALORACION";
-          else if (pathLower.includes("/borradores")) category = "PACIENTE";
+        // Extraer paciente ID si existe en params, query o body
+        const pacienteCandidate =
+          req.params?.id ||
+          req.params?.pacienteId ||
+          req.query?.pacienteId ||
+          req.body?.paciente ||
+          req.body?.pacienteId ||
+          req.body?.paciente_id ||
+          (category === "PACIENTE" && data?.id ? data.id : null);
 
-          const level = statusCode >= 500 ? "ERROR" : statusCode >= 400 ? "WARN" : "INFO";
-          const action = `${req.method}_${category}`;
-
-          // Extraer paciente ID si existe en params o body
-          const pacienteCandidate =
-            req.params?.id ||
-            req.params?.pacienteId ||
-            req.body?.paciente ||
-            req.body?.pacienteId ||
-            req.body?.paciente_id ||
-            (category === "PACIENTE" && data?.id ? data.id : null);
-
-          self.log(level, category, action, {
-            user: username,
-            paciente: pacienteCandidate,
-            valoracion: pathLower.includes("/valoraciones") ? req.params?.id : null,
-            ip: req.ip || req.connection?.remoteAddress || "",
-            userAgent: req.get("User-Agent") || "",
-            details: {
-              path: req.originalUrl,
-              method: req.method,
-              statusCode,
-              duration: `${duration}ms`,
-              body: sanitizedBody,
-              response: isError ? data : undefined,
-            },
-          });
-        }
+        self.log(level, category, action, {
+          user: username,
+          paciente: pacienteCandidate,
+          valoracion: pathLower.includes("/valoraciones") ? req.params?.id : null,
+          method: req.method,
+          path: req.originalUrl,
+          ip: req.ip || req.connection?.remoteAddress || "",
+          userAgent: req.get("User-Agent") || "",
+          details: {
+            path: req.originalUrl,
+            method: req.method,
+            statusCode,
+            duration: `${duration}ms`,
+            params: Object.keys(req.query || {}).length > 0 ? req.query : undefined,
+            body: sanitizedBody,
+            response: statusCode >= 400 ? data : undefined,
+          },
+        });
 
         return originalJson.call(this, data);
       };
