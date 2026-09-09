@@ -337,13 +337,31 @@ class PDFReportGenerator {
           await dibujarTablaUnaColumna("Motivo de Consulta", sanitizeText(motivoConsulta));
         }
 
+        // --- ENFERMEDAD ACTUAL ---
+        const enfActual = getVal(valuation, 'enfermedadActual', 'enfermedad_actual');
+        if (enfActual) {
+          await dibujarTablaUnaColumna("Enfermedad Actual", sanitizeText(enfActual));
+        }
+
         const esValorValido = (v) => {
           if (v === null || v === undefined || v === '') return false;
+          if (Array.isArray(v)) return v.length > 0;
+          if (typeof v === 'object') return Object.keys(v).length > 0 && Object.values(v).some(esValorValido);
           if (typeof v === 'string') {
             const s = v.trim();
             if (s === '-' || s === '.') return false;
           }
           return true;
+        };
+
+        const TITULOS_SECCIONES = {
+          antecedentes: "Antecedentes",
+          signosvitales: "Signos Vitales",
+          modulopediatria: "Módulo de Desarrollo Pediátrico",
+          modulopisopelvico: "Módulo de Piso Pélvico",
+          modulolactancia: "Módulo de Lactancia",
+          moduloperinatal: "Módulo Perinatal",
+          examenfisico: "Examen Físico"
         };
 
         const formatLabel = (key) => {
@@ -388,7 +406,7 @@ class PDFReportGenerator {
                 objects.push([key, value]);
               }
             } else {
-              const strVal = String(value);
+              const strVal = Array.isArray(value) ? value.join(', ') : String(value);
               if (strVal.length > 60 || strVal.includes('\n')) {
                 blocks.push([formatLabel(key), strVal]);
               } else {
@@ -412,20 +430,51 @@ class PDFReportGenerator {
 
         // --- CONTENIDO CLÍNICO DINÁMICO ---
         const modulosPorTipo = {
-          nino: ['moduloPediatria', 'modulo_pediatria'],
-          adulto: ['signosVitales', 'signos_vitales', 'moduloPisoPelvico', 'modulo_piso_pelvico'],
-          lactancia: ['moduloLactancia', 'modulo_lactancia'],
-          perinatal: ['signosVitales', 'signos_vitales', 'moduloPerinatal', 'modulo_perinatal']
+          nino: [
+            'antecedentes',
+            'signosVitales', 'signos_vitales',
+            'moduloPediatria', 'modulo_pediatria',
+            'examenFisico', 'examen_fisico'
+          ],
+          adulto: [
+            'antecedentes',
+            'signosVitales', 'signos_vitales',
+            'moduloPisoPelvico', 'modulo_piso_pelvico',
+            'examenFisico', 'examen_fisico'
+          ],
+          lactancia: [
+            'antecedentes',
+            'signosVitales', 'signos_vitales',
+            'moduloLactancia', 'modulo_lactancia',
+            'examenFisico', 'examen_fisico'
+          ],
+          perinatal: [
+            'antecedentes',
+            'signosVitales', 'signos_vitales',
+            'moduloPerinatal', 'modulo_perinatal',
+            'moduloPediatria', 'modulo_pediatria',
+            'examenFisico', 'examen_fisico'
+          ]
         };
-        const modulos = modulosPorTipo[type] || [];
+        const modulos = modulosPorTipo[type] || [
+          'antecedentes',
+          'signosVitales', 'signos_vitales',
+          'moduloPediatria', 'modulo_pediatria',
+          'moduloPisoPelvico', 'modulo_piso_pelvico',
+          'moduloLactancia', 'modulo_lactancia',
+          'moduloPerinatal', 'modulo_perinatal',
+          'examenFisico', 'examen_fisico'
+        ];
         const modulosImpresos = new Set();
 
         for (const modName of modulos) {
           const baseName = modName.replace(/_/g, '').toLowerCase();
           if (modulosImpresos.has(baseName)) continue;
 
-          if (valuation[modName] && Object.values(valuation[modName]).some(v => esValorValido(v))) {
-            await imprimirObjetoDinamico(valuation[modName], formatLabel(modName));
+          const dataMod = valuation[modName];
+          if (dataMod && typeof dataMod === 'object' && Object.values(dataMod).some(v => esValorValido(v))) {
+            const tituloSecc = TITULOS_SECCIONES[baseName] || formatLabel(modName);
+            await imprimirObjetoDinamico(dataMod, tituloSecc);
             modulosImpresos.add(baseName);
           }
         }

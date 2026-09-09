@@ -34,17 +34,33 @@ router.get("/exportar-pdf/:id", async (req, res) => {
       return res.status(404).json({ message: "Valoración no encontrada" });
     }
 
-    // Determinar el tipo de reporte según el módulo activo
-    let reportType = type;
+    // Determinar el tipo de reporte según el módulo activo y el paciente
     const modLactancia = valoracion.modulo_lactancia || {};
     const modPisoPelvico = valoracion.modulo_piso_pelvico || {};
     const modPediatria = valoracion.modulo_pediatria || {};
+    const tp = (valoracion.tipo_programa || "").toLowerCase();
+    const legacy = valoracion.datos_legacy || valoracion._datos_legacy || {};
 
-    if (!reportType) {
-      if (modPediatria.desarrollo_motor) reportType = "nino";
+    const esPediatrico =
+      tp.includes("pediatr") ||
+      tp.includes("estimulaci") ||
+      Boolean(modPediatria && Object.keys(modPediatria).length > 0 && Object.values(modPediatria).some(v => v && (typeof v !== 'object' || Object.keys(v).length > 0))) ||
+      (legacy && String(legacy.tipoPrograma || "").toLowerCase().includes("pediatr")) ||
+      (pacienteData && pacienteData.fecha_nacimiento && (() => {
+        const diffAnios = (new Date() - new Date(pacienteData.fecha_nacimiento)) / (1000 * 60 * 60 * 24 * 365.25);
+        return diffAnios < 12;
+      })());
+
+    let reportType = type;
+    if (esPediatrico && (!reportType || reportType === "perinatal")) {
+      reportType = "nino";
+    } else if (!reportType) {
+      if (modPediatria.desarrollo_motor || modPediatria.desarrolloMotor) reportType = "nino";
       else if (modPisoPelvico.icicq_frecuencia) reportType = "adulto";
       else if (modLactancia.experiencia_lactancia) reportType = "lactancia";
-      else if (valoracion.cod_consulta === "890211") reportType = "perinatal";
+      else if (tp.includes("lactancia")) reportType = "lactancia";
+      else if (tp.includes("piso") || valoracion.cod_consulta === "890202") reportType = "adulto";
+      else if (tp.includes("perinatal")) reportType = "perinatal";
       else reportType = "nino";
     }
 
@@ -84,7 +100,7 @@ router.get("/exportar-pdf/:id", async (req, res) => {
     try {
       const pdfGenerator = require("../utils/pdfReportGenerator");
       const pdfBuffer = await pdfGenerator.generateValuationPDF(
-        valoracion,
+        valoracion.toJSON ? valoracion.toJSON() : valoracion,
         paciente,
         reportType,
         profesional,
