@@ -79,6 +79,7 @@ const { verificarToken } = require("./routes/auth");
 
 // Pacientes y Registros (Unificados)
 app.use("/api/pacientes", verificarToken(), require("./routes/pacientes"));
+app.use("/api/cumpleanos", verificarToken(), require("./routes/cumpleanos"));
 app.use("/api/configuracion", verificarToken(), require("./routes/configuracion"));
 
 // Módulos Médicos y Valoraciones (Unificados)
