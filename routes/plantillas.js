@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
+  sequelize,
   PlantillaHC,
   SeccionHC,
   CampoHC,
@@ -8,6 +9,42 @@ const {
   TipoCampoHC,
 } = require("../models-sequelize");
 const { sembrarPlantillaPediatria } = require("../scripts/seed-plantilla-pediatria");
+
+// Helper para asegurar la tabla de bloques de seguimiento configurados por programa
+async function asegurarTablaSeguimientoBloques() {
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS plantillas_seguimiento_bloques (
+      programa VARCHAR(80) PRIMARY KEY,
+      bloques JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+}
+
+// Limpia respuestas de pacientes dejando solo la estructura configurable (preguntas y columnas/filas vacías)
+function limpiarEstructuraBloques(bloques) {
+  if (!Array.isArray(bloques)) return [];
+  return bloques.map((b) => {
+    if (b.tipoBloque === "pregunta") {
+      return {
+        id: b.id,
+        tipoBloque: "pregunta",
+        pregunta: b.pregunta || "",
+        respuesta: "",
+      };
+    }
+    const cols = Array.isArray(b.columnas) && b.columnas.length > 0
+      ? b.columnas
+      : ["Fecha / Parámetro", "Medición / Avance", "Observaciones"];
+    return {
+      id: b.id,
+      tipoBloque: "tabla",
+      titulo: b.titulo || "Tabla de Progreso",
+      columnas: cols,
+      filas: [new Array(cols.length).fill("")],
+    };
+  });
+}
 
 /**
  * @route   GET /api/plantillas
@@ -27,6 +64,51 @@ router.get("/", async (req, res) => {
     }
     console.error("Error obteniendo plantillas:", error);
     res.status(500).json({ error: "Error al obtener plantillas" });
+  }
+});
+
+/**
+ * @route   GET /api/plantillas/seguimiento-bloques/:programa
+ * @desc    Obtener preguntas y tablas configuradas por defecto para seguimientos de un programa
+ */
+router.get("/seguimiento-bloques/:programa", async (req, res) => {
+  try {
+    const programa = String(req.params.programa || "").toUpperCase();
+    await asegurarTablaSeguimientoBloques();
+    const [rows] = await sequelize.query(
+      `SELECT programa, bloques FROM plantillas_seguimiento_bloques WHERE programa = $1`,
+      { bind: [programa] }
+    );
+    const bloques = rows && rows[0] && Array.isArray(rows[0].bloques) ? rows[0].bloques : [];
+    res.json({ programa, bloques });
+  } catch (error) {
+    console.error("Error obteniendo bloques de seguimiento:", error);
+    res.json({ programa: req.params.programa, bloques: [] });
+  }
+});
+
+/**
+ * @route   PUT /api/plantillas/seguimiento-bloques/:programa
+ * @desc    Guardar la estructura de preguntas y tablas de seguimiento para reutilizarla en futuros controles
+ */
+router.put("/seguimiento-bloques/:programa", async (req, res) => {
+  try {
+    const programa = String(req.params.programa || "").toUpperCase();
+    const bloquesLimpios = limpiarEstructuraBloques(req.body?.bloques);
+    await asegurarTablaSeguimientoBloques();
+
+    await sequelize.query(
+      `INSERT INTO plantillas_seguimiento_bloques (programa, bloques, updated_at)
+       VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP)
+       ON CONFLICT (programa)
+       DO UPDATE SET bloques = EXCLUDED.bloques, updated_at = CURRENT_TIMESTAMP`,
+      { bind: [programa, JSON.stringify(bloquesLimpios)] }
+    );
+
+    res.json({ programa, bloques: bloquesLimpios });
+  } catch (error) {
+    console.error("Error guardando bloques de seguimiento:", error);
+    res.status(500).json({ error: "No se pudieron guardar los bloques de seguimiento" });
   }
 });
 
