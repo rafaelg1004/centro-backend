@@ -479,6 +479,39 @@ class PDFReportGenerator {
           }
         }
 
+        // --- BLOQUES DINÁMICOS DE SEGUIMIENTO (Si existen) ---
+        const bloquesSeguimiento =
+          valuation.modulo_pediatria?.bloquesSeguimiento ||
+          valuation.moduloPediatria?.bloquesSeguimiento ||
+          valuation.modulo_piso_pelvico?.bloquesSeguimiento ||
+          valuation.moduloPisoPelvico?.bloquesSeguimiento ||
+          valuation.modulo_lactancia?.bloquesSeguimiento ||
+          valuation.moduloLactancia?.bloquesSeguimiento ||
+          valuation.modulo_perinatal?.bloquesSeguimiento ||
+          valuation.moduloPerinatal?.bloquesSeguimiento;
+
+        if (Array.isArray(bloquesSeguimiento) && bloquesSeguimiento.length > 0) {
+          const preguntas = bloquesSeguimiento.filter(b => b.tipoBloque === 'pregunta');
+          const tablas = bloquesSeguimiento.filter(b => b.tipoBloque === 'tabla');
+
+          if (preguntas.length > 0) {
+            const filasPreguntas = preguntas.map((p, idx) => [
+              `Pregunta #${idx + 1}: ${p.pregunta || 'Sin título'}`,
+              p.respuesta || 'Sin respuesta'
+            ]);
+            await dibujarTablaDosColumnas("PREGUNTAS ADICIONALES DE PROGRESO", filasPreguntas);
+          }
+
+          for (const tbl of tablas) {
+            if (tbl.filas && tbl.filas.length > 0) {
+              const infoTabla = (tbl.filas || []).map((f) => {
+                return (tbl.columnas || []).map((col, cIdx) => `${col}: ${f[cIdx] || '-'}`).join(' | ');
+              }).join('\n');
+              await dibujarTablaUnaColumna(`TABLA: ${tbl.titulo || 'Progreso'}`, infoTabla);
+            }
+          }
+        }
+
         // --- DIAGNOSTICO Y TRATAMIENTO (Común a todos) ---
         const diagnostico = getVal(valuation, 'diagnosticoFisioterapeutico', 'diagnostico_fisioterapeutico');
         if (diagnostico) {
