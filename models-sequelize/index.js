@@ -22,11 +22,21 @@ const defineCIE10 = require("./CIE10");
 const defineCupsCatalogo = require("./CupsCatalogo");
 const defineConfiguracionClinica = require("./ConfiguracionClinica");
 const defineBorradorFormulario = require("./BorradorFormulario");
+const defineTipoCampoHC = require("./TipoCampoHC");
+const definePlantillaHC = require("./PlantillaHC");
+const defineSeccionHC = require("./SeccionHC");
+const defineCampoHC = require("./CampoHC");
+const defineOpcionCampoHC = require("./OpcionCampoHC");
 
 // Definir modelos
 const Paciente = definePaciente(sequelize, DataTypes);
 const ConfiguracionClinica = defineConfiguracionClinica(sequelize, DataTypes);
 const BorradorFormulario = defineBorradorFormulario(sequelize, DataTypes);
+const TipoCampoHC = defineTipoCampoHC(sequelize, DataTypes);
+const PlantillaHC = definePlantillaHC(sequelize, DataTypes);
+const SeccionHC = defineSeccionHC(sequelize, DataTypes);
+const CampoHC = defineCampoHC(sequelize, DataTypes);
+const OpcionCampoHC = defineOpcionCampoHC(sequelize, DataTypes);
 const CodigoCUPS = defineCodigoCUPS(sequelize, DataTypes);
 const ValoracionFisioterapia = defineValoracionFisioterapia(
   sequelize,
@@ -158,6 +168,53 @@ Log.belongsTo(Paciente, {
   as: "paciente_obj",
 });
 
+// ============================================
+// RELACIONES DEL MOTOR DINÁMICO DE HISTORIAS
+// ============================================
+
+// Plantilla -> Secciones (1:N)
+PlantillaHC.hasMany(SeccionHC, {
+  foreignKey: "plantilla_id",
+  as: "secciones",
+  onDelete: "CASCADE",
+});
+SeccionHC.belongsTo(PlantillaHC, {
+  foreignKey: "plantilla_id",
+  as: "plantilla",
+});
+
+// Sección -> Campos (1:N)
+SeccionHC.hasMany(CampoHC, {
+  foreignKey: "seccion_id",
+  as: "campos",
+  onDelete: "CASCADE",
+});
+CampoHC.belongsTo(SeccionHC, {
+  foreignKey: "seccion_id",
+  as: "seccion",
+});
+
+// Campo -> TipoCampo (N:1)
+CampoHC.belongsTo(TipoCampoHC, {
+  foreignKey: "tipo_campo_codigo",
+  as: "tipo_info",
+});
+TipoCampoHC.hasMany(CampoHC, {
+  foreignKey: "tipo_campo_codigo",
+  as: "campos",
+});
+
+// Campo -> Opciones (1:N)
+CampoHC.hasMany(OpcionCampoHC, {
+  foreignKey: "campo_id",
+  as: "opciones",
+  onDelete: "CASCADE",
+});
+OpcionCampoHC.belongsTo(CampoHC, {
+  foreignKey: "campo_id",
+  as: "campo",
+});
+
 module.exports = {
   sequelize,
   Paciente,
@@ -175,4 +232,9 @@ module.exports = {
   CupsCatalogo,
   ConfiguracionClinica,
   BorradorFormulario,
+  TipoCampoHC,
+  PlantillaHC,
+  SeccionHC,
+  CampoHC,
+  OpcionCampoHC,
 };
