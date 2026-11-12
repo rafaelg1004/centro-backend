@@ -21,6 +21,10 @@ router.get("/", async (req, res) => {
     });
     res.json(plantillas);
   } catch (error) {
+    // Si las tablas aún no han sido creadas/sembradas, devolver lista vacía en vez de 500
+    if (error?.original?.code === "42P01" || String(error?.message || "").includes("does not exist")) {
+      return res.json([]);
+    }
     console.error("Error obteniendo plantillas:", error);
     res.status(500).json({ error: "Error al obtener plantillas" });
   }
