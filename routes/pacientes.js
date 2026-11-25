@@ -291,6 +291,32 @@ router.get("/recientes", async (req, res) => {
   }
 });
 
+router.get("/reporte-medicos", async (req, res) => {
+  try {
+    const pacientes = await Paciente.findAll({
+      attributes: [
+        "id",
+        "nombres",
+        "apellidos",
+        "tipo_documento_identificacion",
+        "num_documento_identificacion",
+        "es_adulto",
+        "pediatra",
+        "medico_tratante",
+        "aseguradora",
+        "nombre_madre",
+        "datos_contacto",
+        "created_at",
+      ],
+      order: [["created_at", "DESC"]],
+    });
+    res.json(pacientes);
+  } catch (e) {
+    console.error("Error en /reporte-medicos:", e);
+    res.status(500).json({ error: "Error al obtener reporte de médicos" });
+  }
+});
+
 router.get(
   "/:id",
   logAccesoMiddleware("CONSULTAR_PACIENTE"),
